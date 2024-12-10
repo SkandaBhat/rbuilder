@@ -1,5 +1,5 @@
 use crate::{
-    building::builders::{UnfinishedBlockBuildingSink, UnfinishedBlockBuildingSinkFactory},
+    building::builders::{UnfinishedBlockBuildingSink, UnfinishedBlockBuildingSinkFactory, best_block_store::{BestBlockTracker, GlobalBestBlockStore}},
     live_builder::payload_events::MevBoostSlotData,
 };
 use alloy_primitives::U256;
@@ -15,7 +15,7 @@ use super::{
         sequential_sealer_bid_maker::SequentialSealerBidMaker,
         wallet_balance_watcher::WalletBalanceWatcher,
     },
-    relay_submit::BuilderSinkFactory,
+    // relay_submit::BuilderSinkFactory,
 };
 
 /// UnfinishedBlockBuildingSinkFactory to bid blocks against the competition.
@@ -27,12 +27,14 @@ pub struct BlockSealingBidderFactory<P> {
     /// Factory for the SlotBidder for blocks.
     bidding_service: Box<dyn BiddingService>,
     /// Factory for the final destination for blocks.
-    block_sink_factory: Box<dyn BuilderSinkFactory>,
+    // block_sink_factory: Box<dyn BuilderSinkFactory>,
     /// SlotBidder are subscribed to the proper block in the bid_value_source.
     competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
     wallet_balance_watcher: WalletBalanceWatcher<P>,
     /// See [ParallelSealerBidMaker]
     max_concurrent_seals: usize,
+    /// Best block tracker.
+    best_block_tracker: BestBlockTracker,
 }
 
 impl<P> Debug for BlockSealingBidderFactory<P> {
@@ -50,19 +52,22 @@ impl<P> Debug for BlockSealingBidderFactory<P> {
 }
 
 impl<P> BlockSealingBidderFactory<P> {
-    pub fn new(
+    pub async fn new(
         bidding_service: Box<dyn BiddingService>,
-        block_sink_factory: Box<dyn BuilderSinkFactory>,
+        // block_sink_factory: Box<dyn BuilderSinkFactory>,
         competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
         wallet_balance_watcher: WalletBalanceWatcher<P>,
         max_concurrent_seals: usize,
+        best_block_store: GlobalBestBlockStore,
     ) -> Self {
+        let best_block_tracker = BestBlockTracker::new(best_block_store).await;
         Self {
             bidding_service,
-            block_sink_factory,
+            // block_sink_factory
             competition_bid_value_source,
             wallet_balance_watcher,
             max_concurrent_seals,
+            best_block_tracker,
         }
     }
 }
@@ -102,20 +107,20 @@ where
             }
         }
 
-        let finished_block_sink = self.block_sink_factory.create_builder_sink(
-            slot_data.clone(),
-            self.competition_bid_value_source.clone(),
-            cancel.clone(),
-        );
+        // let finished_block_sink = self.block_sink_factory.create_builder_sink(
+        //     slot_data.clone(),
+        //     self.competition_bid_value_source.clone(),
+        //     cancel.clone(),
+        // );
         let sealer: Box<dyn BidMaker + Send + Sync> = if self.max_concurrent_seals == 1 {
             Box::new(SequentialSealerBidMaker::new(
-                Arc::from(finished_block_sink),
+                self.best_block_tracker.clone(),
                 cancel.clone(),
             ))
         } else {
             Box::new(ParallelSealerBidMaker::new(
                 self.max_concurrent_seals,
-                Arc::from(finished_block_sink),
+                self.best_block_tracker.clone(),
                 cancel.clone(),
             ))
         };

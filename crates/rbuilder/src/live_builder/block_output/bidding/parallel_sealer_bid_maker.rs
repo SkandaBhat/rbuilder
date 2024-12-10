@@ -4,7 +4,7 @@ use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 
-use crate::live_builder::block_output::relay_submit::BlockBuildingSink;
+use crate::building::builders::best_block_store::BestBlockTracker;
 
 use super::interfaces::{Bid, BidMaker};
 
@@ -53,13 +53,12 @@ impl PendingBid {
 impl ParallelSealerBidMaker {
     pub fn new(
         max_concurrent_seals: usize,
-        sink: Arc<dyn BlockBuildingSink>,
+        best_block_tracker: BestBlockTracker,
         cancel: CancellationToken,
     ) -> Self {
         let notify = Arc::new(Notify::new());
         let pending_bid = Arc::new(PendingBid::new(notify.clone()));
         let mut sealing_process = ParallelSealerBidMakerProcess {
-            sink,
             cancel,
             pending_bid: pending_bid.clone(),
             notify: notify.clone(),
@@ -68,6 +67,7 @@ impl ParallelSealerBidMaker {
                 seals_in_progress: Default::default(),
             }),
             max_concurrent_seals,
+            best_block_tracker: best_block_tracker.clone(),
         };
 
         tokio::task::spawn(async move {
@@ -86,8 +86,6 @@ struct SealsInProgress {
 
 /// Background task waiting for new bids to seal.
 struct ParallelSealerBidMakerProcess {
-    /// Destination of the finished blocks.
-    sink: Arc<dyn BlockBuildingSink>,
     cancel: CancellationToken,
     pending_bid: Arc<PendingBid>,
     /// Signaled when we set a new bid or a sealing finishes.
@@ -96,6 +94,8 @@ struct ParallelSealerBidMakerProcess {
     seal_control: Arc<SealsInProgress>,
     /// Maximum number of concurrent sealings.
     max_concurrent_seals: usize,
+    /// Best block tracker.
+    best_block_tracker: BestBlockTracker,
 }
 
 impl ParallelSealerBidMakerProcess {
@@ -124,10 +124,12 @@ impl ParallelSealerBidMakerProcess {
             // Take sealing "slot"
             *self.seal_control.seals_in_progress.lock() += 1;
             let seal_control = self.seal_control.clone();
-            let sink = self.sink.clone();
-            tokio::task::spawn_blocking(move || {
+            let best_block_tracker = self.best_block_tracker.clone();
+            tokio::spawn(async move {
                 match block.finalize_block(payout_tx_val) {
-                    Ok(res) => sink.new_block(res.block),
+                    Ok(res) => {
+                        best_block_tracker.try_and_update(res.block).await;
+                    },
                     Err(error) => error!(
                         block_number,
                         ?error,

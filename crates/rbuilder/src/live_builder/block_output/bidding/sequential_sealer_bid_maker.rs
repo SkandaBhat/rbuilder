@@ -1,4 +1,4 @@
-use crate::live_builder::block_output::relay_submit::BlockBuildingSink;
+use crate::building::builders::best_block_store::BestBlockTracker;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::sync::Notify;
@@ -51,12 +51,12 @@ impl PendingBid {
 }
 
 impl SequentialSealerBidMaker {
-    pub fn new(sink: Arc<dyn BlockBuildingSink>, cancel: CancellationToken) -> Self {
+    pub fn new(best_block_tracker: BestBlockTracker, cancel: CancellationToken) -> Self {
         let pending_bid = Arc::new(PendingBid::new());
         let mut sealing_process = SequentialSealerBidMakerProcess {
-            sink,
             cancel,
             pending_bid: pending_bid.clone(),
+            best_block_tracker: best_block_tracker.clone(),
         };
 
         tokio::task::spawn(async move {
@@ -69,9 +69,9 @@ impl SequentialSealerBidMaker {
 /// Background task waiting for new bids to seal.
 struct SequentialSealerBidMakerProcess {
     /// Destination of the finished blocks.
-    sink: Arc<dyn BlockBuildingSink>,
     cancel: CancellationToken,
     pending_bid: Arc<PendingBid>,
+    best_block_tracker: BestBlockTracker,
 }
 
 impl SequentialSealerBidMakerProcess {
@@ -92,7 +92,9 @@ impl SequentialSealerBidMakerProcess {
             let block_number = block.building_context().block();
             match tokio::task::spawn_blocking(move || block.finalize_block(payout_tx_val)).await {
                 Ok(finalize_res) => match finalize_res {
-                    Ok(res) => self.sink.new_block(res.block),
+                    Ok(res) => {
+                        self.best_block_tracker.try_and_update(res.block).await;
+                    },
                     Err(error) => {
                         if error.is_critical() {
                             error!(
