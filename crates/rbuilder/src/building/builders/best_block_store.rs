@@ -131,62 +131,33 @@ mod tests {
     use std::time::Duration;
     use time::OffsetDateTime;
 
+    #[allow(dead_code)]
+    fn make_block(bid: u64) -> Block {
+        Block {
+            trace: BuiltBlockTrace {
+                included_orders: vec![],
+                bid_value: U256::from(bid),
+                true_bid_value: U256::from(bid),
+                got_no_signer_error: false,
+                orders_closed_at: OffsetDateTime::now_utc(),
+                orders_sealed_at: OffsetDateTime::now_utc(),
+                fill_time: Duration::from_secs(0),
+                finalize_time: Duration::from_secs(0),
+                root_hash_time: Duration::from_secs(0),
+            },
+            sealed_block: SealedBlock::default(),
+            txs_blobs_sidecars: vec![],
+            execution_requests: vec![],
+            builder_name: "test_builder".to_string(),
+        }
+    }
+
     #[tokio::test]
     async fn test_compare_and_update() {
         let store = GlobalBestBlockStore::new();
-        let initial_block = Block {
-            trace: BuiltBlockTrace {
-                included_orders: vec![],
-                bid_value: U256::from(100),
-                true_bid_value: U256::from(100),
-                got_no_signer_error: false,
-                orders_closed_at: OffsetDateTime::now_utc(),
-                orders_sealed_at: OffsetDateTime::now_utc(),
-                fill_time: Duration::from_secs(0),
-                finalize_time: Duration::from_secs(0),
-                root_hash_time: Duration::from_secs(0),
-            },
-            sealed_block: SealedBlock::default(),
-            txs_blobs_sidecars: vec![],
-            execution_requests: vec![],
-            builder_name: "test".to_string(),
-        };
-
-        let better_block = Block {
-            trace: BuiltBlockTrace {
-                included_orders: vec![],
-                bid_value: U256::from(101),
-                true_bid_value: U256::from(101),
-                got_no_signer_error: false,
-                orders_closed_at: OffsetDateTime::now_utc(),
-                orders_sealed_at: OffsetDateTime::now_utc(),
-                fill_time: Duration::from_secs(0),
-                finalize_time: Duration::from_secs(0),
-                root_hash_time: Duration::from_secs(0),
-            },
-            sealed_block: SealedBlock::default(),
-            txs_blobs_sidecars: vec![],
-            execution_requests: vec![],
-            builder_name: "test".to_string(),
-        };
-
-        let worse_block = Block {
-            trace: BuiltBlockTrace {
-                included_orders: vec![],
-                bid_value: U256::from(99),
-                true_bid_value: U256::from(99),
-                got_no_signer_error: false,
-                orders_closed_at: OffsetDateTime::now_utc(),
-                orders_sealed_at: OffsetDateTime::now_utc(),
-                fill_time: Duration::from_secs(0),
-                finalize_time: Duration::from_secs(0),
-                root_hash_time: Duration::from_secs(0),
-            },
-            sealed_block: SealedBlock::default(),
-            txs_blobs_sidecars: vec![],
-            execution_requests: vec![],
-            builder_name: "test".to_string(),
-        };
+        let initial_block = make_block(100);
+        let better_block = make_block(101);
+        let worse_block = make_block(99);
 
         // Initially store is empty so any block is better
         assert!(store
@@ -219,23 +190,7 @@ mod tests {
         let stream = store.subscribe();
         pin_mut!(stream);
 
-        let block = Block {
-            trace: BuiltBlockTrace {
-                included_orders: vec![],
-                bid_value: U256::from(100),
-                true_bid_value: U256::from(100),
-                got_no_signer_error: false,
-                orders_closed_at: OffsetDateTime::now_utc(),
-                orders_sealed_at: OffsetDateTime::now_utc(),
-                fill_time: Duration::from_secs(0),
-                finalize_time: Duration::from_secs(0),
-                root_hash_time: Duration::from_secs(0),
-            },
-            sealed_block: SealedBlock::default(),
-            txs_blobs_sidecars: vec![],
-            execution_requests: vec![],
-            builder_name: "test".to_string(),
-        };
+        let block = make_block(100);
 
         // No updates yet, stream should yield None.
         tokio::select! {
@@ -271,23 +226,7 @@ mod tests {
         for v in values.into_iter() {
             let s = store.clone();
             handles.push(tokio::spawn(async move {
-                let block = Block {
-                    trace: BuiltBlockTrace {
-                        included_orders: vec![],
-                        bid_value: U256::from(v),
-                        true_bid_value: U256::from(v),
-                        got_no_signer_error: false,
-                        orders_closed_at: OffsetDateTime::now_utc(),
-                        orders_sealed_at: OffsetDateTime::now_utc(),
-                        fill_time: Duration::from_secs(0),
-                        finalize_time: Duration::from_secs(0),
-                        root_hash_time: Duration::from_secs(0),
-                    },
-                    sealed_block: SealedBlock::default(),
-                    txs_blobs_sidecars: vec![],
-                    execution_requests: vec![],
-                    builder_name: "concurrent_test".to_string(),
-                };
+                let block = make_block(v);
                 let _ = s.compare_and_update(block).await;
             }));
         }
@@ -313,23 +252,7 @@ mod tests {
         // Pin them for iteration
         tokio::pin!(stream1, stream2, stream3);
 
-        let block = Block {
-            trace: BuiltBlockTrace {
-                included_orders: vec![],
-                bid_value: U256::from(150),
-                true_bid_value: U256::from(150),
-                got_no_signer_error: false,
-                orders_closed_at: OffsetDateTime::now_utc(),
-                orders_sealed_at: OffsetDateTime::now_utc(),
-                fill_time: Duration::from_secs(0),
-                finalize_time: Duration::from_secs(0),
-                root_hash_time: Duration::from_secs(0),
-            },
-            sealed_block: SealedBlock::default(),
-            txs_blobs_sidecars: vec![],
-            execution_requests: vec![],
-            builder_name: "multiple_subscribers_test".to_string(),
-        };
+        let block = make_block(150);
 
         // Update the store
         assert!(store.compare_and_update(block.clone()).await.is_ok());
@@ -347,58 +270,13 @@ mod tests {
         let late_subscriber = store.subscribe();
         pin_mut!(late_subscriber);
 
-        let better_block = Block {
-            trace: BuiltBlockTrace {
-                included_orders: vec![],
-                bid_value: U256::from(200),
-                true_bid_value: U256::from(200),
-                got_no_signer_error: false,
-                orders_closed_at: OffsetDateTime::now_utc(),
-                orders_sealed_at: OffsetDateTime::now_utc(),
-                fill_time: Duration::from_secs(0),
-                finalize_time: Duration::from_secs(0),
-                root_hash_time: Duration::from_secs(0),
-            },
-            sealed_block: SealedBlock::default(),
-            txs_blobs_sidecars: vec![],
-            execution_requests: vec![],
-            builder_name: "multiple_subscribers_test".to_string(),
-        };
+        let better_block = make_block(200);
 
         // Update again
         assert!(store.compare_and_update(better_block.clone()).await.is_ok());
 
         let late_received = late_subscriber.next().await.unwrap();
         assert_eq!(late_received.trace.bid_value, U256::from(200));
-    }
-}
-#[cfg(test)]
-mod tracker_tests {
-    use super::*;
-    use crate::building::{BuiltBlockTrace, SealedBlock};
-    use alloy_primitives::U256;
-    use std::time::Duration;
-    use time::OffsetDateTime;
-
-    #[allow(dead_code)]
-    fn make_block(bid: u64) -> Block {
-        Block {
-            trace: BuiltBlockTrace {
-                included_orders: vec![],
-                bid_value: U256::from(bid),
-                true_bid_value: U256::from(bid),
-                got_no_signer_error: false,
-                orders_closed_at: OffsetDateTime::now_utc(),
-                orders_sealed_at: OffsetDateTime::now_utc(),
-                fill_time: Duration::from_secs(0),
-                finalize_time: Duration::from_secs(0),
-                root_hash_time: Duration::from_secs(0),
-            },
-            sealed_block: SealedBlock::default(),
-            txs_blobs_sidecars: vec![],
-            execution_requests: vec![],
-            builder_name: "test_builder".to_string(),
-        }
     }
 
     #[tokio::test]
