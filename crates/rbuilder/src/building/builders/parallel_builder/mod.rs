@@ -30,8 +30,9 @@ use tracing::{error, trace};
 
 use crate::{
     building::builders::{
+        best_block_store::{BestBlockTracker, GlobalBestBlockStore},
         BacktestSimulateBlockInput, Block, BlockBuildingAlgorithm, BlockBuildingAlgorithmInput,
-        LiveBuilderInput, best_block_store::{BestBlockTracker, GlobalBestBlockStore},
+        LiveBuilderInput,
     },
     roothash::RootHashConfig,
 };

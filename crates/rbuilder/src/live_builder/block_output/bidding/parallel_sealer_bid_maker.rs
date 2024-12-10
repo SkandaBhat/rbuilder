@@ -129,7 +129,7 @@ impl ParallelSealerBidMakerProcess {
                 match block.finalize_block(payout_tx_val) {
                     Ok(res) => {
                         best_block_tracker.try_and_update(res.block).await;
-                    },
+                    }
                     Err(error) => error!(
                         block_number,
                         ?error,

@@ -43,7 +43,11 @@ impl GlobalBestBlockStore {
 
     /// Compare the new block with the current best block and update if the new block is better.
     pub async fn compare_and_update(&self, new_block: Block) -> Result<(), UpdateRejected> {
-        info!("Comparing new block {:?} with current best block {:?}", new_block.trace.bid_value, self.get_best_block().await.unwrap().trace.bid_value);
+        info!(
+            "Comparing new block {:?} with current best block {:?}",
+            new_block.trace.bid_value,
+            self.get_best_block().await.unwrap().trace.bid_value
+        );
         let mut guard = self.best_block.lock().await;
         if new_block.has_higher_bid_value_than(guard.as_ref()) {
             info!("Updating best block to {:?}", new_block.trace.bid_value);
@@ -96,17 +100,18 @@ impl BestBlockTracker {
             }
         });
 
-        Self {
-            store,
-            best_block
-        }
+        Self { store, best_block }
     }
 
-    /// Attempt to update the best block with `new_block`. 
+    /// Attempt to update the best block with `new_block`.
     /// If `new_block` is better than the current best block, it tries to update the store.
     /// Returns `true` if the global store was successfully updated.
     pub async fn try_and_update(&self, new_block: Block) -> bool {
-        info!("Trying to update best block {:?} with new block {:?}", self.get_best_block().await.unwrap().trace.bid_value, new_block.trace.bid_value);
+        info!(
+            "Trying to update best block {:?} with new block {:?}",
+            self.get_best_block().await.unwrap().trace.bid_value,
+            new_block.trace.bid_value
+        );
         let current_best = self.best_block.lock().await;
         if new_block.has_higher_bid_value_than(current_best.as_ref()) {
             self.store.compare_and_update(new_block).await.is_ok()
@@ -120,7 +125,6 @@ impl BestBlockTracker {
         self.best_block.lock().await.clone()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -292,10 +296,13 @@ mod tests {
     async fn test_tracker_initially_with_store_data() {
         let store = GlobalBestBlockStore::new();
         let initial_block = make_block(100);
-        store.compare_and_update(initial_block.clone()).await.unwrap();
+        store
+            .compare_and_update(initial_block.clone())
+            .await
+            .unwrap();
 
         let tracker = BestBlockTracker::new(store.clone()).await;
-        
+
         // Tracker should immediately see the block that was in the store
         let best_block = tracker.get_best_block().await;
         assert!(best_block.is_some());
@@ -312,7 +319,10 @@ mod tests {
 
         // Update the store
         let better_block = make_block(200);
-        store.compare_and_update(better_block.clone()).await.unwrap();
+        store
+            .compare_and_update(better_block.clone())
+            .await
+            .unwrap();
 
         // Allow some time for the background task to pick up changes
         tokio::time::sleep(Duration::from_millis(100)).await;

@@ -3,14 +3,12 @@ use std::{marker::PhantomData, sync::Arc, time::Duration};
 use crate::{
     building::{
         builders::{
-            BlockBuildingAlgorithm, BlockBuildingAlgorithmInput, UnfinishedBlockBuildingSinkFactory, best_block_store::GlobalBestBlockStore
+            best_block_store::GlobalBestBlockStore, BlockBuildingAlgorithm,
+            BlockBuildingAlgorithmInput, UnfinishedBlockBuildingSinkFactory,
         },
         BlockBuildingContext,
     },
-    live_builder::{
-        payload_events::MevBoostSlotData,
-        simulation::SlotOrderSimResults,
-    },
+    live_builder::{payload_events::MevBoostSlotData, simulation::SlotOrderSimResults},
     roothash::run_trie_prefetcher,
 };
 use reth_db::Database;
@@ -103,7 +101,8 @@ where
             payload,
             simulations_for_block,
             block_cancellation,
-        ).await;
+        )
+        .await;
     }
 
     /// Per each BlockBuildingAlgorithm creates BlockBuildingAlgorithmInput and Sinks and spawn a task to run it

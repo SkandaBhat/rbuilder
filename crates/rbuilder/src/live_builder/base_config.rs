@@ -1,7 +1,9 @@
 //! Config should always be deserializable, default values should be used
 //!
 use crate::{
-    building::builders::{best_block_store::GlobalBestBlockStore, UnfinishedBlockBuildingSinkFactory},
+    building::builders::{
+        best_block_store::GlobalBestBlockStore, UnfinishedBlockBuildingSinkFactory,
+    },
     live_builder::{order_input::OrderInputConfig, LiveBuilder},
     roothash::RootHashConfig,
     telemetry::{setup_reloadable_tracing_subscriber, LoggerConfig},

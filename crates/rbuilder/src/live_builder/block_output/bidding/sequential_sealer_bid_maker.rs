@@ -94,7 +94,7 @@ impl SequentialSealerBidMakerProcess {
                 Ok(finalize_res) => match finalize_res {
                     Ok(res) => {
                         self.best_block_tracker.try_and_update(res.block).await;
-                    },
+                    }
                     Err(error) => {
                         if error.is_critical() {
                             error!(

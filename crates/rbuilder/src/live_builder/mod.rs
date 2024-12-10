@@ -10,7 +10,10 @@ pub mod watchdog;
 
 use crate::{
     building::{
-        builders::{BlockBuildingAlgorithm, UnfinishedBlockBuildingSinkFactory, best_block_store::GlobalBestBlockStore},
+        builders::{
+            best_block_store::GlobalBestBlockStore, BlockBuildingAlgorithm,
+            UnfinishedBlockBuildingSinkFactory,
+        },
         BlockBuildingContext,
     },
     live_builder::{
@@ -248,12 +251,14 @@ where
                 self.extra_data.clone(),
                 None,
             ) {
-                builder_pool.start_block_building(
-                    payload,
-                    block_ctx,
-                    self.global_cancellation.clone(),
-                    time_until_slot_end.try_into().unwrap_or_default(),
-                ).await;
+                builder_pool
+                    .start_block_building(
+                        payload,
+                        block_ctx,
+                        self.global_cancellation.clone(),
+                        time_until_slot_end.try_into().unwrap_or_default(),
+                    )
+                    .await;
 
                 if let Some(watchdog_sender) = watchdog_sender.as_ref() {
                     watchdog_sender.try_send(()).unwrap_or_default();

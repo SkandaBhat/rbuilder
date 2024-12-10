@@ -1,5 +1,8 @@
 use crate::{
-    building::builders::{UnfinishedBlockBuildingSink, UnfinishedBlockBuildingSinkFactory, best_block_store::{BestBlockTracker, GlobalBestBlockStore}},
+    building::builders::{
+        best_block_store::{BestBlockTracker, GlobalBestBlockStore},
+        UnfinishedBlockBuildingSink, UnfinishedBlockBuildingSinkFactory,
+    },
     live_builder::payload_events::MevBoostSlotData,
 };
 use alloy_primitives::U256;

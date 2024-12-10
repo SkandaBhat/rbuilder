@@ -12,8 +12,9 @@ use derive_more::From;
 use rbuilder::{
     building::{
         builders::{
-            block_building_helper::BlockBuildingHelper, ordering_builder::OrderingBuilderConfig,
-            UnfinishedBlockBuildingSink, UnfinishedBlockBuildingSinkFactory, best_block_store::GlobalBestBlockStore
+            best_block_store::GlobalBestBlockStore, block_building_helper::BlockBuildingHelper,
+            ordering_builder::OrderingBuilderConfig, UnfinishedBlockBuildingSink,
+            UnfinishedBlockBuildingSinkFactory,
         },
         Sorting,
     },
@@ -136,7 +137,8 @@ impl BundlePoolOps {
             config.base_config.live_root_hash_config().unwrap(),
             config.base_config.sbundle_mergeabe_signers(),
             best_block_store.clone(),
-        ).await;
+        )
+        .await;
 
         // Build and run the process
         let builder = config

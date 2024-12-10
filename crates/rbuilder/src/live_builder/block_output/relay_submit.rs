@@ -16,13 +16,13 @@ use crate::{
 };
 use ahash::HashMap;
 use alloy_primitives::{utils::format_ether, U256};
+use futures::StreamExt;
 use reth_chainspec::ChainSpec;
 use reth_primitives::SealedBlock;
 use std::sync::Arc;
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
-use futures::StreamExt;
-use tracing::{debug, error, event, info_span, info, trace, warn, Instrument, Level};
+use tracing::{debug, error, event, info, info_span, trace, warn, Instrument, Level};
 
 use super::{
     bid_observer::BidObserver,
@@ -91,7 +91,6 @@ async fn run_submit_to_relays_job(
         }
         (normal_relays, optimistic_relays)
     };
-
 
     // Create a stream that automatically ends when cancelled
     let block_stream = best_block_store
@@ -441,7 +440,11 @@ pub struct RelayCoordinator {
 }
 
 impl RelayCoordinator {
-    pub fn new(submission_config: SubmissionConfig, relays: Vec<MevBoostRelay>, best_block_store: GlobalBestBlockStore) -> Self {
+    pub fn new(
+        submission_config: SubmissionConfig,
+        relays: Vec<MevBoostRelay>,
+        best_block_store: GlobalBestBlockStore,
+    ) -> Self {
         let relays = relays
             .into_iter()
             .map(|relay| (relay.id.clone(), relay))

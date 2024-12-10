@@ -6,7 +6,10 @@ pub mod ordering_builder;
 pub mod parallel_builder;
 
 use crate::{
-    building::{BlockBuildingContext, BlockOrders, BuiltBlockTrace, SimulatedOrderSink, Sorting, builders::best_block_store::{GlobalBestBlockStore, BestBlockTracker}},
+    building::{
+        builders::best_block_store::{BestBlockTracker, GlobalBestBlockStore},
+        BlockBuildingContext, BlockOrders, BuiltBlockTrace, SimulatedOrderSink, Sorting,
+    },
     live_builder::{payload_events::MevBoostSlotData, simulation::SimulatedOrderCommand},
     primitives::{AccountNonce, OrderId, SimulatedOrder},
     roothash::RootHashConfig,
@@ -14,6 +17,7 @@ use crate::{
 };
 use ahash::HashSet;
 use alloy_primitives::{Address, Bytes, B256};
+use async_trait::async_trait;
 use block_building_helper::BlockBuildingHelper;
 use reth::{
     primitives::{BlobTransactionSidecar, SealedBlock},
@@ -25,7 +29,6 @@ use std::{fmt::Debug, marker::PhantomData, sync::Arc};
 use tokio::sync::{broadcast, broadcast::error::TryRecvError};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
-use async_trait::async_trait;
 
 /// Block we built
 #[derive(Debug, Clone)]

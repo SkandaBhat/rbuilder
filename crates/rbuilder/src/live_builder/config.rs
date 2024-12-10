@@ -28,8 +28,7 @@ use crate::{
         Sorting,
     },
     live_builder::{
-        base_config::EnvOrValue,
-        cli::LiveBuilderConfig, payload_events::MevBoostSlotDataGenerator,
+        base_config::EnvOrValue, cli::LiveBuilderConfig, payload_events::MevBoostSlotDataGenerator,
     },
     mev_boost::BLSBlockSigner,
     primitives::mev_boost::{MevBoostRelay, RelayConfig},
@@ -280,11 +279,8 @@ impl L1Config {
         );
 
         let relays = self.create_relays()?;
-        let relay_coordinator: RelayCoordinator = RelayCoordinator::new(
-            submission_config,
-            relays.clone(),
-            best_block_store.clone(),
-        );
+        let relay_coordinator: RelayCoordinator =
+            RelayCoordinator::new(submission_config, relays.clone(), best_block_store.clone());
         Ok((relay_coordinator, relays))
     }
 }
@@ -323,14 +319,17 @@ impl LiveBuilderConfig for Config {
         let bidding_service: Box<dyn BiddingService> =
             Box::new(TrueBlockValueBiddingService::new(&wallet_history));
 
-        let sink_factory = Box::new(BlockSealingBidderFactory::new(
-            bidding_service,
-            relay_coordinator,
-            Arc::new(NullBidValueSource {}),
-            wallet_balance_watcher,
-            self.l1_config.max_concurrent_seals as usize,
-            best_block_store.clone(),
-        ).await);
+        let sink_factory = Box::new(
+            BlockSealingBidderFactory::new(
+                bidding_service,
+                relay_coordinator,
+                Arc::new(NullBidValueSource {}),
+                wallet_balance_watcher,
+                self.l1_config.max_concurrent_seals as usize,
+                best_block_store.clone(),
+            )
+            .await,
+        );
 
         let payload_event = MevBoostSlotDataGenerator::new(
             self.l1_config.beacon_clients()?,
@@ -355,7 +354,8 @@ impl LiveBuilderConfig for Config {
             root_hash_config,
             self.base_config.sbundle_mergeabe_signers(),
             best_block_store.clone(),
-        ).await;
+        )
+        .await;
         Ok(live_builder.with_builders(builders))
     }
 
@@ -500,9 +500,14 @@ where
         + Clone
         + 'static,
 {
-    let futures = configs
-        .into_iter()
-        .map(|cfg| create_builder(cfg, &root_hash_config, &sbundle_mergeabe_signers, best_block_store.clone()));
+    let futures = configs.into_iter().map(|cfg| {
+        create_builder(
+            cfg,
+            &root_hash_config,
+            &sbundle_mergeabe_signers,
+            best_block_store.clone(),
+        )
+    });
     futures::future::join_all(futures).await
 }
 
@@ -520,24 +525,26 @@ where
         + 'static,
 {
     match cfg.builder {
-        SpecificBuilderConfig::OrderingBuilder(order_cfg) => {
-            Arc::new(OrderingBuildingAlgorithm::new(
+        SpecificBuilderConfig::OrderingBuilder(order_cfg) => Arc::new(
+            OrderingBuildingAlgorithm::new(
                 root_hash_config.clone(),
                 sbundle_mergeabe_signers.to_vec(),
                 order_cfg,
                 cfg.name,
                 best_block_store,
-            ).await)
-        }
-        SpecificBuilderConfig::ParallelBuilder(parallel_cfg) => {
-            Arc::new(ParallelBuildingAlgorithm::new(
+            )
+            .await,
+        ),
+        SpecificBuilderConfig::ParallelBuilder(parallel_cfg) => Arc::new(
+            ParallelBuildingAlgorithm::new(
                 root_hash_config.clone(),
                 sbundle_mergeabe_signers.to_vec(),
                 parallel_cfg,
                 cfg.name,
                 best_block_store.clone(),
-            ).await)
-        }
+            )
+            .await,
+        ),
     }
 }
 

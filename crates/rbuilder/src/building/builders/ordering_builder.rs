@@ -9,8 +9,9 @@ use crate::{
     building::{
         block_orders_from_sim_orders,
         builders::{
-            block_building_helper::BlockBuildingHelper, LiveBuilderInput, OrderIntakeConsumer,
             best_block_store::{BestBlockTracker, GlobalBestBlockStore},
+            block_building_helper::BlockBuildingHelper,
+            LiveBuilderInput, OrderIntakeConsumer,
         },
         BlockBuildingContext, BlockOrders, ExecutionError, Sorting,
     },
@@ -19,6 +20,7 @@ use crate::{
 };
 use ahash::{HashMap, HashSet};
 use alloy_primitives::Address;
+use async_trait::async_trait;
 use reth::revm::cached::CachedReads;
 use reth_db::database::Database;
 use reth_provider::{BlockReader, DatabaseProviderFactory, StateProviderFactory};
@@ -28,9 +30,8 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info_span, trace};
-use async_trait::async_trait;
 use tracing::info;
+use tracing::{error, info_span, trace};
 
 use super::{
     block_building_helper::BlockBuildingHelperFromProvider, handle_building_error,
@@ -404,4 +405,3 @@ where
         run_ordering_builder(live_input, &self.config);
     }
 }
-
