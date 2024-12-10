@@ -13,6 +13,8 @@ use rbuilder::{
             block_building_helper::{BlockBuildingHelper, BlockBuildingHelperFromProvider},
             BlockBuildingAlgorithm, BlockBuildingAlgorithmInput, OrderConsumer,
             UnfinishedBlockBuildingSink, UnfinishedBlockBuildingSinkFactory,
+            best_block_store::GlobalBestBlockStore,
+            best_block_store::BestBlockTracker,
         },
         BlockBuildingContext, SimulatedOrderStore,
     },
@@ -47,7 +49,9 @@ use tokio::{
     sync::{broadcast, mpsc},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{info, level_filters::LevelFilter};
+use tracing::{info, level_filters::LevelFilter, error};
+use async_trait::async_trait;
+use alloy_primitives::U256;
 
 const RETH_DB_PATH: &str = DEFAULT_RETH_DB_PATH;
 
@@ -110,7 +114,8 @@ async fn main() -> eyre::Result<()> {
         global_cancellation: cancel.clone(),
         extra_rpc: RpcModule::new(()),
         sink_factory: Box::new(TraceBlockSinkFactory {}),
-        builders: vec![Arc::new(DummyBuildingAlgorithm::new(10))],
+        builders: vec![Arc::new(DummyBuildingAlgorithm::new(10, GlobalBestBlockStore::new()).await)],
+        best_block_store: GlobalBestBlockStore::new(),
         run_sparse_trie_prefetcher: false,
         orderpool_sender,
         orderpool_receiver,
@@ -157,7 +162,6 @@ impl UnfinishedBlockBuildingSink for TracingBlockSink {
         false
     }
 }
-
 ////////////////////////////
 /// BUILDING ALGORITHM
 ////////////////////////////
@@ -168,13 +172,15 @@ impl UnfinishedBlockBuildingSink for TracingBlockSink {
 struct DummyBuildingAlgorithm {
     /// Amnount of used orders to build a block
     orders_to_use: usize,
+    best_block_tracker: BestBlockTracker,
 }
 
 const ORDER_POLLING_PERIOD: Duration = Duration::from_millis(10);
 const BUILDER_NAME: &str = "DUMMY";
 impl DummyBuildingAlgorithm {
-    pub fn new(orders_to_use: usize) -> Self {
-        Self { orders_to_use }
+    pub async fn new(orders_to_use: usize, best_block_store: GlobalBestBlockStore) -> Self {
+        let best_block_tracker = BestBlockTracker::new(best_block_store).await;
+        Self { orders_to_use, best_block_tracker }
     }
 
     fn wait_for_orders(
@@ -230,6 +236,7 @@ impl DummyBuildingAlgorithm {
     }
 }
 
+#[async_trait]
 impl<P, DB> BlockBuildingAlgorithm<P, DB> for DummyBuildingAlgorithm
 where
     DB: Database + Clone + 'static,
@@ -242,12 +249,21 @@ where
         BUILDER_NAME.to_string()
     }
 
-    fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>) {
+    async fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>) {
         if let Some(orders) = self.wait_for_orders(&input.cancel, input.input) {
             let block = self
                 .build_block(orders, input.provider, &input.ctx)
                 .unwrap();
-            input.sink.new_block(block);
+
+            match block.finalize_block(Some(U256::from(0))) {
+                Ok(res) => {
+                    // try to update best block
+                    self.best_block_tracker.try_and_update(res.block).await;
+                }
+                Err(e) => {
+                    error!("Error on finalize_block on DummyBuildingAlgorithm: {:?}", e);
+                }
+            }
         }
     }
 }
