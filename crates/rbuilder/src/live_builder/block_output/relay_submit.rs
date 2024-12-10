@@ -96,12 +96,12 @@ async fn run_submit_to_relays_job(
     // Create a stream that automatically ends when cancelled
     let block_stream = best_block_store
         .subscribe()
-        .take_until(cancel.cancelled());
+        .take_until(cancel.is_cancelled());
 
     tokio::pin!(block_stream);
 
     while let Some(block) = block_stream.next().await {
-        println!("got a block from the store!: {:?}", block);
+        info!("got a block from the store!: {:?}", block);
         res = Some(BuiltBlockInfo {
             bid_value: block.trace.bid_value,
             true_bid_value: block.trace.true_bid_value,
