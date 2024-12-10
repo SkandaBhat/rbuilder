@@ -6,7 +6,7 @@ use tracing::info;
 
 use super::Block;
 
-const MAX_BUFFER_SIZE: usize = 64;
+const DEFAULT_BUFFER_SIZE: usize = 64;
 
 /// Error returned when an update is rejected.
 #[derive(Debug)]
@@ -27,9 +27,14 @@ impl Default for GlobalBestBlockStore {
 }
 
 impl GlobalBestBlockStore {
-    /// Create a new global best block store.
+    /// Create a new global best block store with default buffer size.
     pub fn new() -> Self {
-        let (tx, _rx) = broadcast::channel(MAX_BUFFER_SIZE);
+        Self::with_buffer_size(DEFAULT_BUFFER_SIZE)
+    }
+
+    /// Create a new global best block store with specified buffer size.
+    pub fn with_buffer_size(buffer_size: usize) -> Self {
+        let (tx, _rx) = broadcast::channel(buffer_size);
         Self {
             best_block: Arc::new(Mutex::new(None)),
             tx,
