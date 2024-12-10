@@ -6,7 +6,7 @@ pub mod ordering_builder;
 pub mod parallel_builder;
 
 use crate::{
-    building::{BlockBuildingContext, BlockOrders, BuiltBlockTrace, SimulatedOrderSink, Sorting},
+    building::{BlockBuildingContext, BlockOrders, BuiltBlockTrace, SimulatedOrderSink, Sorting, builders::best_block_store::{GlobalBestBlockStore, BestBlockTracker}},
     live_builder::{payload_events::MevBoostSlotData, simulation::SimulatedOrderCommand},
     primitives::{AccountNonce, OrderId, SimulatedOrder},
     roothash::RootHashConfig,
@@ -25,6 +25,7 @@ use std::{fmt::Debug, marker::PhantomData, sync::Arc};
 use tokio::sync::{broadcast, broadcast::error::TryRecvError};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
+use async_trait::async_trait;
 
 /// Block we built
 #[derive(Debug, Clone)]
@@ -56,6 +57,7 @@ pub struct LiveBuilderInput<P, DB> {
     pub builder_name: String,
     pub cancel: CancellationToken,
     pub sbundle_mergeabe_signers: Vec<Address>,
+    pub best_block_tracker: BestBlockTracker,
     phantom: PhantomData<DB>,
 }
 
@@ -217,19 +219,21 @@ pub struct BlockBuildingAlgorithmInput<P> {
     pub input: broadcast::Receiver<SimulatedOrderCommand>,
     /// output for the blocks
     pub sink: Arc<dyn UnfinishedBlockBuildingSink>,
+    pub best_block_store: GlobalBestBlockStore,
     pub cancel: CancellationToken,
 }
 
 /// Algorithm to build blocks
 /// build_blocks should send block to input.sink until  input.cancel is cancelled.
 /// slot_bidder should be used to decide how much to bid.
+#[async_trait]
 pub trait BlockBuildingAlgorithm<P, DB>: Debug + Send + Sync
 where
     DB: Database + Clone + 'static,
     P: DatabaseProviderFactory<DB = DB> + StateProviderFactory + Clone + 'static,
 {
     fn name(&self) -> String;
-    fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>);
+    async fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>);
 }
 
 /// Factory used to create UnfinishedBlockBuildingSink for builders.

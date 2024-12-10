@@ -31,7 +31,7 @@ use tracing::{error, trace};
 use crate::{
     building::builders::{
         BacktestSimulateBlockInput, Block, BlockBuildingAlgorithm, BlockBuildingAlgorithmInput,
-        LiveBuilderInput,
+        LiveBuilderInput, best_block_store::{BestBlockTracker, GlobalBestBlockStore},
     },
     roothash::RootHashConfig,
 };
@@ -47,6 +47,7 @@ use self::{
 
 pub type GroupId = usize;
 pub type ConflictResolutionResultPerGroup = (GroupId, (ResolutionResult, ConflictGroup));
+use async_trait::async_trait;
 
 /// ParallelBuilderConfig configures parallel builder.
 /// * `num_threads` - number of threads to use for merging.
@@ -387,24 +388,29 @@ pub struct ParallelBuildingAlgorithm {
     sbundle_mergeabe_signers: Vec<Address>,
     config: ParallelBuilderConfig,
     name: String,
+    best_block_tracker: BestBlockTracker,
 }
 
 impl ParallelBuildingAlgorithm {
-    pub fn new(
+    pub async fn new(
         root_hash_config: RootHashConfig,
         sbundle_mergeabe_signers: Vec<Address>,
         config: ParallelBuilderConfig,
         name: String,
+        best_block_store: GlobalBestBlockStore,
     ) -> Self {
+        let best_block_tracker = BestBlockTracker::new(best_block_store).await;
         Self {
             root_hash_config,
             sbundle_mergeabe_signers,
             config,
             name,
+            best_block_tracker,
         }
     }
 }
 
+#[async_trait]
 impl<P, DB> BlockBuildingAlgorithm<P, DB> for ParallelBuildingAlgorithm
 where
     DB: Database + Clone + 'static,
@@ -417,7 +423,7 @@ where
         self.name.clone()
     }
 
-    fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>) {
+    async fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>) {
         let live_input = LiveBuilderInput {
             provider: input.provider,
             root_hash_config: self.root_hash_config.clone(),
@@ -427,6 +433,7 @@ where
             builder_name: self.name.clone(),
             cancel: input.cancel,
             sbundle_mergeabe_signers: self.sbundle_mergeabe_signers.clone(),
+            best_block_tracker: self.best_block_tracker.clone(),
             phantom: Default::default(),
         };
         run_parallel_builder(live_input, &self.config);
