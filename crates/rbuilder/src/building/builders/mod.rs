@@ -1,4 +1,5 @@
 //! builders is a subprocess that builds a block
+pub mod best_block_store;
 pub mod block_building_helper;
 pub mod mock_block_building_helper;
 pub mod ordering_builder;
@@ -35,6 +36,14 @@ pub struct Block {
     /// The Pectra execution requests for this bid.
     pub execution_requests: Vec<Bytes>,
     pub builder_name: String,
+}
+
+impl Block {
+    /// Returns true if this block has a higher bid value than the other block.
+    pub fn has_higher_bid_value_than(&self, other: Option<&Block>) -> bool {
+        let current_best_value = other.map(|b| b.trace.bid_value).unwrap_or_default();
+        self.trace.bid_value > current_best_value
+    }
 }
 
 #[derive(Debug)]
