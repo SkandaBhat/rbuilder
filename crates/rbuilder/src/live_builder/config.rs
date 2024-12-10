@@ -11,7 +11,7 @@ use super::{
             wallet_balance_watcher::WalletBalanceWatcher,
         },
         block_sealing_bidder_factory::BlockSealingBidderFactory,
-        relay_submit::{RelaySubmitSinkFactory, SubmissionConfig},
+        relay_submit::{RelayCoordinator, SubmissionConfig},
     },
 };
 use crate::{
@@ -28,7 +28,7 @@ use crate::{
         Sorting,
     },
     live_builder::{
-        base_config::EnvOrValue, block_output::relay_submit::BuilderSinkFactory,
+        base_config::EnvOrValue,
         cli::LiveBuilderConfig, payload_events::MevBoostSlotDataGenerator,
     },
     mev_boost::BLSBlockSigner,
@@ -256,13 +256,13 @@ impl L1Config {
         })
     }
 
-    /// Creates the RelaySubmitSinkFactory and also returns the associated relays.
-    pub fn create_relays_sealed_sink_factory(
+    /// Creates the relay coordinator and also returns the associated relays.
+    pub fn create_relays_and_relay_coordinator(
         &self,
         chain_spec: Arc<ChainSpec>,
         bid_observer: Box<dyn BidObserver + Send + Sync>,
         best_block_store: GlobalBestBlockStore,
-    ) -> eyre::Result<(Box<dyn BuilderSinkFactory>, Vec<MevBoostRelay>)> {
+    ) -> eyre::Result<(RelayCoordinator, Vec<MevBoostRelay>)> {
         let submission_config = self.submission_config(chain_spec, bid_observer)?;
         info!(
             "Builder mev boost normal relay pubkey: {:?}",
@@ -280,12 +280,12 @@ impl L1Config {
         );
 
         let relays = self.create_relays()?;
-        let sink_factory: Box<dyn BuilderSinkFactory> = Box::new(RelaySubmitSinkFactory::new(
+        let relay_coordinator: RelayCoordinator = RelayCoordinator::new(
             submission_config,
             relays.clone(),
             best_block_store.clone(),
-        ));
-        Ok((sink_factory, relays))
+        );
+        Ok((relay_coordinator, relays))
     }
 }
 
@@ -309,7 +309,7 @@ impl LiveBuilderConfig for Config {
         // create sinlge best block store
         let best_block_store = GlobalBestBlockStore::new();
 
-        let (_sink_sealed_factory, relays) = self.l1_config.create_relays_sealed_sink_factory(
+        let (relay_coordinator, relays) = self.l1_config.create_relays_and_relay_coordinator(
             self.base_config.chain_spec()?,
             Box::new(NullBidObserver {}),
             best_block_store.clone(),
@@ -325,7 +325,7 @@ impl LiveBuilderConfig for Config {
 
         let sink_factory = Box::new(BlockSealingBidderFactory::new(
             bidding_service,
-            // sink_sealed_factory,
+            relay_coordinator,
             Arc::new(NullBidValueSource {}),
             wallet_balance_watcher,
             self.l1_config.max_concurrent_seals as usize,

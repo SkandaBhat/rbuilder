@@ -1,5 +1,5 @@
 use crate::{
-    building::builders::{Block, best_block_store::GlobalBestBlockStore},
+    building::builders::best_block_store::GlobalBestBlockStore,
     live_builder::payload_events::MevBoostSlotData,
     mev_boost::{
         sign_block_for_relay, BLSBlockSigner, RelayError, SubmitBlockErr, SubmitBlockRequest,
@@ -16,15 +16,13 @@ use crate::{
 };
 use ahash::HashMap;
 use alloy_primitives::{utils::format_ether, U256};
-use mockall::automock;
-use parking_lot::Mutex;
 use reth_chainspec::ChainSpec;
 use reth_primitives::SealedBlock;
 use std::sync::Arc;
-use tokio::{sync::Notify, time::Instant};
+use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use futures::StreamExt;
-use tracing::{debug, error, event, info_span, trace, warn, Instrument, Level};
+use tracing::{debug, error, event, info_span, info, trace, warn, Instrument, Level};
 
 use super::{
     bid_observer::BidObserver,
@@ -33,68 +31,6 @@ use super::{
 
 const SIM_ERROR_CATEGORY: &str = "submit_block_simulation";
 const VALIDATION_ERROR_CATEGORY: &str = "validate_block_simulation";
-
-/// Contains the best block so far.
-/// Building updates via compare_and_update while relay submitter polls via take_best_block.
-/// A new block can be waited without polling via wait_for_change.
-#[derive(Debug, Default)]
-pub struct BestBlockCell {
-    block: Mutex<Option<Block>>,
-    block_notify: Notify,
-}
-
-impl BestBlockCell {
-    pub fn compare_and_update(&self, block: Block) {
-        let mut best_block = self.block.lock();
-        let old_value = best_block
-            .as_ref()
-            .map(|b| b.trace.bid_value)
-            .unwrap_or_default();
-        if block.trace.bid_value > old_value {
-            *best_block = Some(block);
-            self.block_notify.notify_one();
-        }
-    }
-
-    pub fn take_best_block(&self) -> Option<Block> {
-        self.block.lock().take()
-    }
-
-    pub async fn wait_for_change(&self) {
-        self.block_notify.notified().await
-    }
-}
-
-/// Adapts BestBlockCell to BlockBuildingSink by calling compare_and_update on new_block.
-#[derive(Debug)]
-struct BestBlockCellToBlockBuildingSink {
-    best_block_cell: Arc<BestBlockCell>,
-}
-
-impl BlockBuildingSink for BestBlockCellToBlockBuildingSink {
-    fn new_block(&self, block: Block) {
-        self.best_block_cell.compare_and_update(block);
-    }
-}
-
-/// Final destination of blocks (eg: submit to the relays).
-#[automock]
-pub trait BlockBuildingSink: std::fmt::Debug + Send + Sync {
-    fn new_block(&self, block: Block);
-}
-
-/// Factory used to create BlockBuildingSink..
-pub trait BuilderSinkFactory: std::fmt::Debug + Send + Sync {
-    /// # Arguments
-    /// slot_bidder: Not always needed but simplifies the design.
-    fn create_builder_sink(
-        &self,
-        slot_data: MevBoostSlotData,
-        competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
-        cancel: CancellationToken,
-    ) -> Box<dyn BlockBuildingSink>;
-}
-
 #[derive(Debug)]
 pub struct SubmissionConfig {
     pub chain_spec: Arc<ChainSpec>,
@@ -498,13 +434,13 @@ async fn submit_bid_to_the_relay(
 
 /// Real life BuilderSinkFactory that send the blocks to the Relay
 #[derive(Debug)]
-pub struct RelaySubmitSinkFactory {
+pub struct RelayCoordinator {
     submission_config: Arc<SubmissionConfig>,
     relays: HashMap<MevBoostRelayID, MevBoostRelay>,
     best_block_store: GlobalBestBlockStore,
 }
 
-impl RelaySubmitSinkFactory {
+impl RelayCoordinator {
     pub fn new(submission_config: SubmissionConfig, relays: Vec<MevBoostRelay>, best_block_store: GlobalBestBlockStore) -> Self {
         let relays = relays
             .into_iter()
@@ -516,17 +452,14 @@ impl RelaySubmitSinkFactory {
             best_block_store,
         }
     }
-}
 
-impl BuilderSinkFactory for RelaySubmitSinkFactory {
-    fn create_builder_sink(
+    pub fn start_submission_job(
         &self,
         slot_data: MevBoostSlotData,
         competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
         cancel: CancellationToken,
-    ) -> Box<dyn BlockBuildingSink> {
-        let best_block_cell = Arc::new(BestBlockCell::default());
-
+    ) {
+        info!("Starting submission job");
         let relays = slot_data
             .relays
             .iter()
@@ -545,6 +478,5 @@ impl BuilderSinkFactory for RelaySubmitSinkFactory {
             competition_bid_value_source,
             self.best_block_store.clone(),
         ));
-        Box::new(BestBlockCellToBlockBuildingSink { best_block_cell })
     }
 }

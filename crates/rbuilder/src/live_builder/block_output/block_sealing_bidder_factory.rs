@@ -15,7 +15,7 @@ use super::{
         sequential_sealer_bid_maker::SequentialSealerBidMaker,
         wallet_balance_watcher::WalletBalanceWatcher,
     },
-    // relay_submit::BuilderSinkFactory,
+    relay_submit::RelayCoordinator,
 };
 
 /// UnfinishedBlockBuildingSinkFactory to bid blocks against the competition.
@@ -27,7 +27,7 @@ pub struct BlockSealingBidderFactory<P> {
     /// Factory for the SlotBidder for blocks.
     bidding_service: Box<dyn BiddingService>,
     /// Factory for the final destination for blocks.
-    // block_sink_factory: Box<dyn BuilderSinkFactory>,
+    relay_coordinator: RelayCoordinator,
     /// SlotBidder are subscribed to the proper block in the bid_value_source.
     competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
     wallet_balance_watcher: WalletBalanceWatcher<P>,
@@ -54,7 +54,7 @@ impl<P> Debug for BlockSealingBidderFactory<P> {
 impl<P> BlockSealingBidderFactory<P> {
     pub async fn new(
         bidding_service: Box<dyn BiddingService>,
-        // block_sink_factory: Box<dyn BuilderSinkFactory>,
+        relay_coordinator: RelayCoordinator,
         competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
         wallet_balance_watcher: WalletBalanceWatcher<P>,
         max_concurrent_seals: usize,
@@ -63,7 +63,7 @@ impl<P> BlockSealingBidderFactory<P> {
         let best_block_tracker = BestBlockTracker::new(best_block_store).await;
         Self {
             bidding_service,
-            // block_sink_factory
+            relay_coordinator,
             competition_bid_value_source,
             wallet_balance_watcher,
             max_concurrent_seals,
@@ -107,11 +107,13 @@ where
             }
         }
 
-        // let finished_block_sink = self.block_sink_factory.create_builder_sink(
-        //     slot_data.clone(),
-        //     self.competition_bid_value_source.clone(),
-        //     cancel.clone(),
-        // );
+        // start submission job
+        self.relay_coordinator.start_submission_job(
+            slot_data.clone(),
+            self.competition_bid_value_source.clone(),
+            cancel.clone(),
+        );
+
         let sealer: Box<dyn BidMaker + Send + Sync> = if self.max_concurrent_seals == 1 {
             Box::new(SequentialSealerBidMaker::new(
                 self.best_block_tracker.clone(),
