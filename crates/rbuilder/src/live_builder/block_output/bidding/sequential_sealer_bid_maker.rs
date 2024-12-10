@@ -84,7 +84,7 @@ impl SequentialSealerBidMakerProcess {
         }
     }
 
-    /// block.finalize_block + self.sink.new_block inside spawn_blocking.
+    /// block.finalize_block inside spawn_blocking.
     async fn check_for_new_bid(&mut self) {
         if let Some(bid) = self.pending_bid.consume_bid() {
             let payout_tx_val = bid.payout_tx_value();

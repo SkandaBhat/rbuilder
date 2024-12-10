@@ -112,7 +112,7 @@ impl ParallelSealerBidMakerProcess {
         self.notify.notified().await
     }
 
-    /// block.finalize_block + self.sink.new_block inside spawn_blocking.
+    /// block.finalize_block inside spawn_blocking.
     async fn check_for_new_bid(&mut self) {
         if *self.seal_control.seals_in_progress.lock() >= self.max_concurrent_seals {
             return;
