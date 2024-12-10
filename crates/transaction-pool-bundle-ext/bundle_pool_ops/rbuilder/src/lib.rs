@@ -13,7 +13,7 @@ use rbuilder::{
     building::{
         builders::{
             block_building_helper::BlockBuildingHelper, ordering_builder::OrderingBuilderConfig,
-            UnfinishedBlockBuildingSink, UnfinishedBlockBuildingSinkFactory,
+            UnfinishedBlockBuildingSink, UnfinishedBlockBuildingSinkFactory, best_block_store::GlobalBestBlockStore
         },
         Sorting,
     },
@@ -128,11 +128,15 @@ impl BundlePoolOps {
             }),
         };
 
+        // create sinlge best block store
+        let best_block_store = GlobalBestBlockStore::new();
+
         let builders = create_builders(
             vec![builder_strategy],
             config.base_config.live_root_hash_config().unwrap(),
             config.base_config.sbundle_mergeabe_signers(),
-        );
+            best_block_store.clone(),
+        ).await;
 
         // Build and run the process
         let builder = config
@@ -142,6 +146,7 @@ impl BundlePoolOps {
                 Box::new(sink_factory),
                 slot_source,
                 provider,
+                best_block_store.clone(),
             )
             .await
             .unwrap()
