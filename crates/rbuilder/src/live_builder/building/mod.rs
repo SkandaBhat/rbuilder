@@ -3,11 +3,14 @@ use std::{marker::PhantomData, sync::Arc, time::Duration};
 use crate::{
     building::{
         builders::{
-            BlockBuildingAlgorithm, BlockBuildingAlgorithmInput, UnfinishedBlockBuildingSinkFactory,
+            BlockBuildingAlgorithm, BlockBuildingAlgorithmInput, UnfinishedBlockBuildingSinkFactory, best_block_store::GlobalBestBlockStore
         },
         BlockBuildingContext,
     },
-    live_builder::{payload_events::MevBoostSlotData, simulation::SlotOrderSimResults},
+    live_builder::{
+        payload_events::MevBoostSlotData,
+        simulation::SlotOrderSimResults,
+    },
     roothash::run_trie_prefetcher,
 };
 use reth_db::Database;
@@ -32,6 +35,7 @@ pub struct BlockBuildingPool<P, DB> {
     orderpool_subscriber: order_input::OrderPoolSubscriber,
     order_simulation_pool: OrderSimulationPool<P>,
     run_sparse_trie_prefetcher: bool,
+    best_block_store: GlobalBestBlockStore,
     phantom: PhantomData<DB>,
 }
 
@@ -50,6 +54,7 @@ where
         orderpool_subscriber: order_input::OrderPoolSubscriber,
         order_simulation_pool: OrderSimulationPool<P>,
         run_sparse_trie_prefetcher: bool,
+        best_block_store: GlobalBestBlockStore,
     ) -> Self {
         BlockBuildingPool {
             provider,
@@ -58,12 +63,13 @@ where
             orderpool_subscriber,
             order_simulation_pool,
             run_sparse_trie_prefetcher,
+            best_block_store,
             phantom: PhantomData,
         }
     }
 
     /// Connects OrdersForBlock->OrderReplacementManager->Simulations and calls start_building_job
-    pub fn start_block_building(
+    pub async fn start_block_building(
         &mut self,
         payload: payload_events::MevBoostSlotData,
         block_ctx: BlockBuildingContext,
@@ -97,11 +103,11 @@ where
             payload,
             simulations_for_block,
             block_cancellation,
-        );
+        ).await;
     }
 
     /// Per each BlockBuildingAlgorithm creates BlockBuildingAlgorithmInput and Sinks and spawn a task to run it
-    fn start_building_job(
+    async fn start_building_job(
         &mut self,
         ctx: BlockBuildingContext,
         slot_data: MevBoostSlotData,
@@ -122,10 +128,11 @@ where
                 input: broadcast_input.subscribe(),
                 sink: builder_sink.clone(),
                 cancel: cancel.clone(),
+                best_block_store: self.best_block_store.clone(),
             };
             let builder = builder.clone();
-            tokio::task::spawn_blocking(move || {
-                builder.build_blocks(input);
+            tokio::spawn(async move {
+                builder.build_blocks(input).await;
                 debug!(block = block_number, builder_name, "Stopped builder job");
             });
         }
@@ -133,7 +140,7 @@ where
         if self.run_sparse_trie_prefetcher {
             let input = broadcast_input.subscribe();
             let provider = self.provider.clone();
-            tokio::task::spawn_blocking(move || {
+            tokio::spawn(async move {
                 run_trie_prefetcher(
                     ctx.attributes.parent,
                     ctx.shared_sparse_mpt_cache,

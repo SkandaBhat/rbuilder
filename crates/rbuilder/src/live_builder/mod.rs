@@ -10,7 +10,7 @@ pub mod watchdog;
 
 use crate::{
     building::{
-        builders::{BlockBuildingAlgorithm, UnfinishedBlockBuildingSinkFactory},
+        builders::{BlockBuildingAlgorithm, UnfinishedBlockBuildingSinkFactory, best_block_store::GlobalBestBlockStore},
         BlockBuildingContext,
     },
     live_builder::{
@@ -105,6 +105,7 @@ where
 
     pub sink_factory: Box<dyn UnfinishedBlockBuildingSinkFactory>,
     pub builders: Vec<Arc<dyn BlockBuildingAlgorithm<P, DB>>>,
+    pub best_block_store: GlobalBestBlockStore,
     pub extra_rpc: RpcModule<()>,
 
     /// Notify rbuilder of new [`ReplaceableOrderPoolCommand`] flow via this channel.
@@ -176,6 +177,7 @@ where
             orderpool_subscriber,
             order_simulation_pool,
             self.run_sparse_trie_prefetcher,
+            self.best_block_store.clone(),
         );
 
         let watchdog_sender = match self.watchdog_timeout {
@@ -251,7 +253,7 @@ where
                     block_ctx,
                     self.global_cancellation.clone(),
                     time_until_slot_end.try_into().unwrap_or_default(),
-                );
+                ).await;
 
                 if let Some(watchdog_sender) = watchdog_sender.as_ref() {
                     watchdog_sender.try_send(()).unwrap_or_default();

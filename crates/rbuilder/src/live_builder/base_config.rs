@@ -1,7 +1,7 @@
 //! Config should always be deserializable, default values should be used
 //!
 use crate::{
-    building::builders::UnfinishedBlockBuildingSinkFactory,
+    building::builders::{best_block_store::GlobalBestBlockStore, UnfinishedBlockBuildingSinkFactory},
     live_builder::{order_input::OrderInputConfig, LiveBuilder},
     roothash::RootHashConfig,
     telemetry::{setup_reloadable_tracing_subscriber, LoggerConfig},
@@ -173,6 +173,7 @@ impl BaseConfig {
         cancellation_token: tokio_util::sync::CancellationToken,
         sink_factory: Box<dyn UnfinishedBlockBuildingSinkFactory>,
         slot_source: SlotSourceType,
+        best_block_store: GlobalBestBlockStore,
     ) -> eyre::Result<
         super::LiveBuilder<
             ProviderFactoryReopener<NodeTypesWithDBAdapter<EthereumNode, Arc<DatabaseEnv>>>,
@@ -189,6 +190,7 @@ impl BaseConfig {
             sink_factory,
             slot_source,
             provider_factory,
+            best_block_store,
         )
         .await
     }
@@ -200,6 +202,7 @@ impl BaseConfig {
         sink_factory: Box<dyn UnfinishedBlockBuildingSinkFactory>,
         slot_source: SlotSourceType,
         provider: P,
+        best_block_store: GlobalBestBlockStore,
     ) -> eyre::Result<super::LiveBuilder<P, DB, SlotSourceType>>
     where
         DB: Database + Clone + 'static,
@@ -227,6 +230,7 @@ impl BaseConfig {
             extra_rpc: RpcModule::new(()),
             sink_factory,
             builders: Vec::new(),
+            best_block_store,
 
             run_sparse_trie_prefetcher: self.root_hash_use_sparse_trie,
 
