@@ -95,7 +95,7 @@ async fn run_submit_to_relays_job(
     // Create a stream that automatically ends when cancelled
     let block_stream = best_block_store
         .subscribe()
-        .take_until(cancel.is_cancelled());
+        .take_until(cancel.cancelled());
 
     tokio::pin!(block_stream);
 
