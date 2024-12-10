@@ -1,5 +1,5 @@
 use crate::{
-    building::builders::Block,
+    building::builders::{Block, best_block_store::GlobalBestBlockStore},
     live_builder::payload_events::MevBoostSlotData,
     mev_boost::{
         sign_block_for_relay, BLSBlockSigner, RelayError, SubmitBlockErr, SubmitBlockRequest,
@@ -23,6 +23,7 @@ use reth_primitives::SealedBlock;
 use std::sync::Arc;
 use tokio::{sync::Notify, time::Instant};
 use tokio_util::sync::CancellationToken;
+use futures::StreamExt;
 use tracing::{debug, error, event, info_span, trace, warn, Instrument, Level};
 
 use super::{
@@ -128,12 +129,12 @@ struct BuiltBlockInfo {
 ///    returns the best bid made
 #[allow(clippy::too_many_arguments)]
 async fn run_submit_to_relays_job(
-    best_bid: Arc<BestBlockCell>,
     slot_data: MevBoostSlotData,
     relays: Vec<MevBoostRelay>,
     config: Arc<SubmissionConfig>,
     cancel: CancellationToken,
     competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
+    best_block_store: GlobalBestBlockStore,
 ) -> Option<BuiltBlockInfo> {
     let best_bid_sync_source = BestBidSyncSource::new(
         competition_bid_value_source,
@@ -155,24 +156,16 @@ async fn run_submit_to_relays_job(
         (normal_relays, optimistic_relays)
     };
 
-    let mut last_bid_value = U256::from(0);
-    'submit: loop {
-        if cancel.is_cancelled() {
-            break 'submit res;
-        }
 
-        best_bid.wait_for_change().await;
-        let block = if let Some(new_block) = best_bid.take_best_block() {
-            if new_block.trace.bid_value > last_bid_value {
-                last_bid_value = new_block.trace.bid_value;
-                new_block
-            } else {
-                continue 'submit;
-            }
-        } else {
-            continue 'submit;
-        };
+    // Create a stream that automatically ends when cancelled
+    let block_stream = best_block_store
+        .subscribe()
+        .take_until(cancel.cancelled());
 
+    tokio::pin!(block_stream);
+
+    while let Some(block) = block_stream.next().await {
+        println!("got a block from the store!: {:?}", block);
         res = Some(BuiltBlockInfo {
             bid_value: block.trace.bid_value,
             true_bid_value: block.trace.true_bid_value,
@@ -223,7 +216,7 @@ async fn run_submit_to_relays_job(
                 Ok(res) => res,
                 Err(err) => {
                     error!(parent: &submission_span, err = ?err, "Error signing block for relay");
-                    continue 'submit;
+                    return res;
                 }
             };
             let optimistic_signed_submission = match sign_block_for_relay(
@@ -239,7 +232,7 @@ async fn run_submit_to_relays_job(
                 Ok(res) => res,
                 Err(err) => {
                     error!(parent: &submission_span, err = ?err, "Error signing block for relay");
-                    continue 'submit;
+                    return res;
                 }
             };
             (normal_signed_submission, optimistic_signed_submission)
@@ -256,7 +249,7 @@ async fn run_submit_to_relays_job(
             )
             .instrument(submission_span)
             .await;
-            continue 'submit;
+            return res;
         }
 
         measure_block_e2e_latency(&block.trace.included_orders);
@@ -331,23 +324,24 @@ async fn run_submit_to_relays_job(
             );
         })
     }
+    res
 }
 
 pub async fn run_submit_to_relays_job_and_metrics(
-    best_bid: Arc<BestBlockCell>,
     slot_data: MevBoostSlotData,
     relays: Vec<MevBoostRelay>,
     config: Arc<SubmissionConfig>,
     cancel: CancellationToken,
     competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
+    best_block_store: GlobalBestBlockStore,
 ) {
     let last_build_block_info = run_submit_to_relays_job(
-        best_bid,
         slot_data,
         relays,
         config,
         cancel,
         competition_bid_value_source,
+        best_block_store,
     )
     .await;
     if let Some(last_build_block_info) = last_build_block_info {
@@ -507,10 +501,11 @@ async fn submit_bid_to_the_relay(
 pub struct RelaySubmitSinkFactory {
     submission_config: Arc<SubmissionConfig>,
     relays: HashMap<MevBoostRelayID, MevBoostRelay>,
+    best_block_store: GlobalBestBlockStore,
 }
 
 impl RelaySubmitSinkFactory {
-    pub fn new(submission_config: SubmissionConfig, relays: Vec<MevBoostRelay>) -> Self {
+    pub fn new(submission_config: SubmissionConfig, relays: Vec<MevBoostRelay>, best_block_store: GlobalBestBlockStore) -> Self {
         let relays = relays
             .into_iter()
             .map(|relay| (relay.id.clone(), relay))
@@ -518,6 +513,7 @@ impl RelaySubmitSinkFactory {
         Self {
             submission_config: Arc::new(submission_config),
             relays,
+            best_block_store,
         }
     }
 }
@@ -542,12 +538,12 @@ impl BuilderSinkFactory for RelaySubmitSinkFactory {
             })
             .collect();
         tokio::spawn(run_submit_to_relays_job_and_metrics(
-            best_block_cell.clone(),
             slot_data,
             relays,
             self.submission_config.clone(),
             cancel,
             competition_bid_value_source,
+            self.best_block_store.clone(),
         ));
         Box::new(BestBlockCellToBlockBuildingSink { best_block_cell })
     }
