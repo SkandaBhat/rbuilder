@@ -299,6 +299,7 @@ mod tests {
             .unwrap();
 
         let tracker = BestBlockTracker::new(store.clone());
+        tracker.init().await;
 
         // Tracker should immediately see the block that was in the store
         let best_block = tracker.get_best_block().await;
@@ -310,6 +311,7 @@ mod tests {
     async fn test_tracker_updates_on_new_broadcast() {
         let store = GlobalBestBlockStore::new();
         let tracker = BestBlockTracker::new(store.clone());
+        tracker.init().await;
 
         // Initially empty
         assert!(tracker.get_best_block().await.is_none());
@@ -333,7 +335,7 @@ mod tests {
     async fn test_try_and_update_improves_block() {
         let store = GlobalBestBlockStore::new();
         let tracker = BestBlockTracker::new(store.clone());
-
+        tracker.init().await;
         let block_100 = make_block(100);
         assert!(tracker.try_and_update(block_100.clone()).await);
 
@@ -360,6 +362,10 @@ mod tests {
         let store = GlobalBestBlockStore::new();
         let tracker1 = BestBlockTracker::new(store.clone());
         let tracker2 = BestBlockTracker::new(store.clone());
+
+        // Initialize both trackers
+        tracker1.init().await;
+        tracker2.init().await;
 
         // No best block initially
         assert!(tracker1.get_best_block().await.is_none());
