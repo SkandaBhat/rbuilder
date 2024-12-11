@@ -81,21 +81,28 @@ pub struct BestBlockTracker {
 }
 
 impl BestBlockTracker {
-    /// Craete a new tracker and start background tracking of the provided store.
-    /// This spawns a background task that will track the best block and update the local best block.
-    pub async fn new(store: GlobalBestBlockStore) -> Self {
-        let best_block = Arc::new(Mutex::new(store.get_best_block().await));
-        let best_block_clone = best_block.clone();
-        let mut rx = store.subscribe_to_updates();
+    /// Create a new uninitialized tracker
+    pub fn new(store: GlobalBestBlockStore) -> Self {
+        Self {
+            store,
+            best_block: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Initialize the tracker with the current best block and start background tracking
+    pub async fn init(&self) {
+        let initial_block = self.store.get_best_block().await;
+        *self.best_block.lock().await = initial_block;
+
+        let best_block = self.best_block.clone();
+        let mut rx = self.store.subscribe_to_updates();
 
         // start background task to track best blocks
         tokio::spawn(async move {
             while let Ok(block) = rx.recv().await {
-                *best_block_clone.lock().await = Some(block);
+                *best_block.lock().await = Some(block);
             }
         });
-
-        Self { store, best_block }
     }
 
     /// Attempt to update the best block with `new_block`.
@@ -276,7 +283,7 @@ mod tests {
     #[tokio::test]
     async fn test_tracker_initially_empty_store() {
         let store = GlobalBestBlockStore::new();
-        let tracker = BestBlockTracker::new(store.clone()).await;
+        let tracker = BestBlockTracker::new(store.clone());
 
         // Store is empty initially, tracker should also reflect no best block
         assert!(tracker.get_best_block().await.is_none());
@@ -291,7 +298,7 @@ mod tests {
             .await
             .unwrap();
 
-        let tracker = BestBlockTracker::new(store.clone()).await;
+        let tracker = BestBlockTracker::new(store.clone());
 
         // Tracker should immediately see the block that was in the store
         let best_block = tracker.get_best_block().await;
@@ -302,7 +309,7 @@ mod tests {
     #[tokio::test]
     async fn test_tracker_updates_on_new_broadcast() {
         let store = GlobalBestBlockStore::new();
-        let tracker = BestBlockTracker::new(store.clone()).await;
+        let tracker = BestBlockTracker::new(store.clone());
 
         // Initially empty
         assert!(tracker.get_best_block().await.is_none());
@@ -325,7 +332,7 @@ mod tests {
     #[tokio::test]
     async fn test_try_and_update_improves_block() {
         let store = GlobalBestBlockStore::new();
-        let tracker = BestBlockTracker::new(store.clone()).await;
+        let tracker = BestBlockTracker::new(store.clone());
 
         let block_100 = make_block(100);
         assert!(tracker.try_and_update(block_100.clone()).await);
@@ -351,8 +358,8 @@ mod tests {
     #[tokio::test]
     async fn test_multiple_trackers_see_same_updates() {
         let store = GlobalBestBlockStore::new();
-        let tracker1 = BestBlockTracker::new(store.clone()).await;
-        let tracker2 = BestBlockTracker::new(store.clone()).await;
+        let tracker1 = BestBlockTracker::new(store.clone());
+        let tracker2 = BestBlockTracker::new(store.clone());
 
         // No best block initially
         assert!(tracker1.get_best_block().await.is_none());
@@ -384,7 +391,7 @@ mod tests {
     #[tokio::test]
     async fn test_concurrent_try_and_update() {
         let store = GlobalBestBlockStore::new();
-        let tracker = BestBlockTracker::new(store.clone()).await;
+        let tracker = BestBlockTracker::new(store.clone());
 
         // We'll try multiple updates concurrently
         let candidates = vec![50, 150, 120, 200, 100];

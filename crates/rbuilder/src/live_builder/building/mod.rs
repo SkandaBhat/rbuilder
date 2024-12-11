@@ -15,7 +15,7 @@ use reth_db::Database;
 use reth_provider::{BlockReader, DatabaseProviderFactory, StateProviderFactory};
 use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, trace};
+use tracing::{debug, info, trace};
 
 use super::{
     order_input::{
@@ -67,7 +67,7 @@ where
     }
 
     /// Connects OrdersForBlock->OrderReplacementManager->Simulations and calls start_building_job
-    pub async fn start_block_building(
+    pub fn start_block_building(
         &mut self,
         payload: payload_events::MevBoostSlotData,
         block_ctx: BlockBuildingContext,
@@ -91,22 +91,24 @@ where
             Box::new(order_replacement_manager),
         );
 
+        info!("Starting simulation job");
         let simulations_for_block = self.order_simulation_pool.spawn_simulation_job(
             block_ctx.clone(),
             orders_for_block,
             block_cancellation.clone(),
         );
+        info!("Simulation job finished: {:?}", simulations_for_block);
+        info!("Starting building job");
         self.start_building_job(
             block_ctx,
             payload,
             simulations_for_block,
             block_cancellation,
-        )
-        .await;
+        );
     }
 
     /// Per each BlockBuildingAlgorithm creates BlockBuildingAlgorithmInput and Sinks and spawn a task to run it
-    async fn start_building_job(
+    fn start_building_job(
         &mut self,
         ctx: BlockBuildingContext,
         slot_data: MevBoostSlotData,
@@ -130,8 +132,8 @@ where
                 best_block_store: self.best_block_store.clone(),
             };
             let builder = builder.clone();
-            tokio::spawn(async move {
-                builder.build_blocks(input).await;
+            tokio::task::spawn_blocking(move || {
+                builder.build_blocks(input);
                 debug!(block = block_number, builder_name, "Stopped builder job");
             });
         }
@@ -139,7 +141,7 @@ where
         if self.run_sparse_trie_prefetcher {
             let input = broadcast_input.subscribe();
             let provider = self.provider.clone();
-            tokio::spawn(async move {
+            tokio::task::spawn_blocking(move || {
                 run_trie_prefetcher(
                     ctx.attributes.parent,
                     ctx.shared_sparse_mpt_cache,

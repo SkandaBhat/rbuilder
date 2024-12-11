@@ -181,7 +181,7 @@ const ORDER_POLLING_PERIOD: Duration = Duration::from_millis(10);
 const BUILDER_NAME: &str = "DUMMY";
 impl DummyBuildingAlgorithm {
     pub async fn new(orders_to_use: usize, best_block_store: GlobalBestBlockStore) -> Self {
-        let best_block_tracker = BestBlockTracker::new(best_block_store).await;
+        let best_block_tracker = BestBlockTracker::new(best_block_store);
         Self {
             orders_to_use,
             best_block_tracker,
@@ -254,7 +254,7 @@ where
         BUILDER_NAME.to_string()
     }
 
-    async fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>) {
+    fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>) {
         if let Some(orders) = self.wait_for_orders(&input.cancel, input.input) {
             let block = self
                 .build_block(orders, input.provider, &input.ctx)
@@ -263,7 +263,7 @@ where
             match block.finalize_block(Some(U256::from(0))) {
                 Ok(res) => {
                     // try to update best block
-                    self.best_block_tracker.try_and_update(res.block).await;
+                    let _ = self.best_block_tracker.try_and_update(res.block);
                 }
                 Err(e) => {
                     error!("Error on finalize_block on DummyBuildingAlgorithm: {:?}", e);

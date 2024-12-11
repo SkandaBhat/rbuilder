@@ -236,7 +236,7 @@ where
     P: DatabaseProviderFactory<DB = DB> + StateProviderFactory + Clone + 'static,
 {
     fn name(&self) -> String;
-    async fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>);
+    fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>);
 }
 
 /// Factory used to create UnfinishedBlockBuildingSink for builders.

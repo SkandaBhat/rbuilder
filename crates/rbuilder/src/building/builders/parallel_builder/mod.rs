@@ -393,14 +393,14 @@ pub struct ParallelBuildingAlgorithm {
 }
 
 impl ParallelBuildingAlgorithm {
-    pub async fn new(
+    pub fn new(
         root_hash_config: RootHashConfig,
         sbundle_mergeabe_signers: Vec<Address>,
         config: ParallelBuilderConfig,
         name: String,
         best_block_store: GlobalBestBlockStore,
     ) -> Self {
-        let best_block_tracker = BestBlockTracker::new(best_block_store).await;
+        let best_block_tracker = BestBlockTracker::new(best_block_store);
         Self {
             root_hash_config,
             sbundle_mergeabe_signers,
@@ -424,7 +424,7 @@ where
         self.name.clone()
     }
 
-    async fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>) {
+    fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>) {
         let live_input = LiveBuilderInput {
             provider: input.provider,
             root_hash_config: self.root_hash_config.clone(),

@@ -137,8 +137,7 @@ impl BundlePoolOps {
             config.base_config.live_root_hash_config().unwrap(),
             config.base_config.sbundle_mergeabe_signers(),
             best_block_store.clone(),
-        )
-        .await;
+        );
 
         // Build and run the process
         let builder = config

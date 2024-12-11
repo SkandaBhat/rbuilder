@@ -328,7 +328,6 @@ impl LiveBuilderConfig for Config {
                 self.l1_config.max_concurrent_seals as usize,
                 best_block_store.clone(),
             )
-            .await,
         );
 
         let payload_event = MevBoostSlotDataGenerator::new(
@@ -354,8 +353,7 @@ impl LiveBuilderConfig for Config {
             root_hash_config,
             self.base_config.sbundle_mergeabe_signers(),
             best_block_store.clone(),
-        )
-        .await;
+        );
         Ok(live_builder.with_builders(builders))
     }
 
@@ -487,7 +485,7 @@ pub fn coinbase_signer_from_secret_key(secret_key: &str) -> eyre::Result<Signer>
     Ok(Signer::try_from_secret(secret_key)?)
 }
 
-pub async fn create_builders<P, DB>(
+pub fn create_builders<P, DB>(
     configs: Vec<BuilderConfig>,
     root_hash_config: RootHashConfig,
     sbundle_mergeabe_signers: Vec<Address>,
@@ -500,18 +498,13 @@ where
         + Clone
         + 'static,
 {
-    let futures = configs.into_iter().map(|cfg| {
-        create_builder(
-            cfg,
-            &root_hash_config,
-            &sbundle_mergeabe_signers,
-            best_block_store.clone(),
-        )
-    });
-    futures::future::join_all(futures).await
+    configs
+        .into_iter()
+        .map(|cfg| create_builder(cfg, &root_hash_config, &sbundle_mergeabe_signers, best_block_store.clone()))
+        .collect()
 }
 
-async fn create_builder<P, DB>(
+fn create_builder<P, DB>(
     cfg: BuilderConfig,
     root_hash_config: &RootHashConfig,
     sbundle_mergeabe_signers: &[Address],
@@ -533,7 +526,6 @@ where
                 cfg.name,
                 best_block_store,
             )
-            .await,
         ),
         SpecificBuilderConfig::ParallelBuilder(parallel_cfg) => Arc::new(
             ParallelBuildingAlgorithm::new(
@@ -543,7 +535,6 @@ where
                 cfg.name,
                 best_block_store.clone(),
             )
-            .await,
         ),
     }
 }

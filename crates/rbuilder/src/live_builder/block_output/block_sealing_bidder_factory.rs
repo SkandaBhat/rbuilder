@@ -55,7 +55,7 @@ impl<P> Debug for BlockSealingBidderFactory<P> {
 }
 
 impl<P> BlockSealingBidderFactory<P> {
-    pub async fn new(
+    pub fn new(
         bidding_service: Box<dyn BiddingService>,
         relay_coordinator: RelayCoordinator,
         competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
@@ -63,7 +63,7 @@ impl<P> BlockSealingBidderFactory<P> {
         max_concurrent_seals: usize,
         best_block_store: GlobalBestBlockStore,
     ) -> Self {
-        let best_block_tracker = BestBlockTracker::new(best_block_store).await;
+        let best_block_tracker = BestBlockTracker::new(best_block_store);
         Self {
             bidding_service,
             relay_coordinator,

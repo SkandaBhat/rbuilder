@@ -74,6 +74,7 @@ where
         + Clone
         + 'static,
 {
+    info!("Starting OrderingBuilder");
     let mut order_intake_consumer = OrderIntakeConsumer::new(
         input.provider.clone(),
         input.input,
@@ -81,6 +82,7 @@ where
         config.sorting,
         &input.sbundle_mergeabe_signers,
     );
+    info!("OrderIntakeConsumer created");
 
     let mut builder = OrderingBuilderContext::new(
         input.provider.clone(),
@@ -89,7 +91,7 @@ where
         config.clone(),
         input.root_hash_config,
     );
-
+    info!("OrderingBuilderContext created");
     // this is a hack to mark used orders until built block trace is implemented as a sane thing
     let mut removed_orders = Vec::new();
     let mut use_suggested_fee_recipient_as_coinbase = config.coinbase_payment;
@@ -357,14 +359,14 @@ pub struct OrderingBuildingAlgorithm {
 }
 
 impl OrderingBuildingAlgorithm {
-    pub async fn new(
+    pub fn new(
         root_hash_config: RootHashConfig,
         sbundle_mergeabe_signers: Vec<Address>,
         config: OrderingBuilderConfig,
         name: String,
         best_block_store: GlobalBestBlockStore,
     ) -> Self {
-        let best_block_tracker = BestBlockTracker::new(best_block_store).await;
+        let best_block_tracker = BestBlockTracker::new(best_block_store);
         Self {
             root_hash_config,
             sbundle_mergeabe_signers,
@@ -388,7 +390,7 @@ where
         self.name.clone()
     }
 
-    async fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>) {
+    fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>) {
         info!("Building blocks with {}", self.name);
         let live_input = LiveBuilderInput {
             provider: input.provider,

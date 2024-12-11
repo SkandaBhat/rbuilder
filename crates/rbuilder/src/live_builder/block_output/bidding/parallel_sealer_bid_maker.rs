@@ -7,6 +7,7 @@ use tracing::error;
 use crate::building::builders::best_block_store::BestBlockTracker;
 
 use super::interfaces::{Bid, BidMaker};
+use tracing::info;
 
 /// BidMaker with a background task sealing multiple parallel bids concurrently.
 /// If several bids arrive while we hit the max of concurrent sealings we keep only the last one since we assume new is better.
@@ -100,6 +101,8 @@ struct ParallelSealerBidMakerProcess {
 
 impl ParallelSealerBidMakerProcess {
     async fn run(&mut self) {
+        self.best_block_tracker.init().await;
+        info!("tracker bg initialized");
         loop {
             tokio::select! {
                 _ = self.wait_for_change() => self.check_for_new_bid().await,
@@ -114,6 +117,7 @@ impl ParallelSealerBidMakerProcess {
 
     /// block.finalize_block inside spawn_blocking.
     async fn check_for_new_bid(&mut self) {
+        info!("Checking for new bid");
         if *self.seal_control.seals_in_progress.lock() >= self.max_concurrent_seals {
             return;
         }
@@ -128,7 +132,7 @@ impl ParallelSealerBidMakerProcess {
             tokio::spawn(async move {
                 match block.finalize_block(payout_tx_val) {
                     Ok(res) => {
-                        best_block_tracker.try_and_update(res.block).await;
+                        let _ = best_block_tracker.try_and_update(res.block);
                     }
                     Err(error) => error!(
                         block_number,
