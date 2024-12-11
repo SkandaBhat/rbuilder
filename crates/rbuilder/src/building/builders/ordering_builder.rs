@@ -73,7 +73,6 @@ where
         + Clone
         + 'static,
 {
-    info!("Starting OrderingBuilder");
     let mut order_intake_consumer = OrderIntakeConsumer::new(
         input.provider.clone(),
         input.input,
@@ -81,7 +80,6 @@ where
         config.sorting,
         &input.sbundle_mergeabe_signers,
     );
-    info!("OrderIntakeConsumer created");
 
     let mut builder = OrderingBuilderContext::new(
         input.provider.clone(),
@@ -90,7 +88,6 @@ where
         config.clone(),
         input.root_hash_config,
     );
-    info!("OrderingBuilderContext created");
     // this is a hack to mark used orders until built block trace is implemented as a sane thing
     let mut removed_orders = Vec::new();
     let mut use_suggested_fee_recipient_as_coinbase = config.coinbase_payment;

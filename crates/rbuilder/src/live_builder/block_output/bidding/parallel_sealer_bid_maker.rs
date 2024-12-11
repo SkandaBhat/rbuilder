@@ -101,8 +101,8 @@ struct ParallelSealerBidMakerProcess {
 
 impl ParallelSealerBidMakerProcess {
     async fn run(&mut self) {
+        // Initialize best block tracker
         self.best_block_tracker.init().await;
-        info!("tracker bg initialized");
         loop {
             tokio::select! {
                 _ = self.wait_for_change() => self.check_for_new_bid().await,

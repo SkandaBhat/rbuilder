@@ -460,7 +460,6 @@ impl RelayCoordinator {
         competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
         cancel: CancellationToken,
     ) {
-        info!("Starting submission job");
         let relays = slot_data
             .relays
             .iter()

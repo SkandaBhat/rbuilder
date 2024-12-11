@@ -15,7 +15,7 @@ use reth_db::Database;
 use reth_provider::{BlockReader, DatabaseProviderFactory, StateProviderFactory};
 use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info, trace};
+use tracing::{debug, trace};
 
 use super::{
     order_input::{
@@ -91,14 +91,11 @@ where
             Box::new(order_replacement_manager),
         );
 
-        info!("Starting simulation job");
         let simulations_for_block = self.order_simulation_pool.spawn_simulation_job(
             block_ctx.clone(),
             orders_for_block,
             block_cancellation.clone(),
         );
-        info!("Simulation job finished: {:?}", simulations_for_block);
-        info!("Starting building job");
         self.start_building_job(
             block_ctx,
             payload,

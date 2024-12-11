@@ -6,7 +6,6 @@ use tokio_util::sync::CancellationToken;
 use tracing::error;
 
 use super::interfaces::{Bid, BidMaker};
-use tracing::info;
 
 /// BidMaker with a background task sealing only one bid at a time.
 /// If several bids arrive while sealing another one we keep only the last one since we assume new is better.
@@ -77,9 +76,8 @@ struct SequentialSealerBidMakerProcess {
 
 impl SequentialSealerBidMakerProcess {
     async fn run(&mut self) {
-        info!("SequentialSealerBidMakerProcess starting");
+        // Initialize best block tracker
         self.best_block_tracker.init().await;
-        info!("tracker bg initialized");
         loop {
             tokio::select! {
                 _ = self.pending_bid.wait_for_change() => self.check_for_new_bid().await,
