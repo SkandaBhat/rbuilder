@@ -262,9 +262,8 @@ where
                 Ok(res) => {
                     // block on the async operation
                     tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(
-                            self.best_block_tracker.try_and_update(res.block)
-                        )
+                        tokio::runtime::Handle::current()
+                            .block_on(self.best_block_tracker.try_and_update(res.block))
                     });
                 }
                 Err(e) => {
