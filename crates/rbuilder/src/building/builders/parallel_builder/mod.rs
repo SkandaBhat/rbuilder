@@ -48,7 +48,6 @@ use self::{
 
 pub type GroupId = usize;
 pub type ConflictResolutionResultPerGroup = (GroupId, (ResolutionResult, ConflictGroup));
-use async_trait::async_trait;
 
 /// ParallelBuilderConfig configures parallel builder.
 /// * `num_threads` - number of threads to use for merging.
@@ -411,7 +410,6 @@ impl ParallelBuildingAlgorithm {
     }
 }
 
-#[async_trait]
 impl<P, DB> BlockBuildingAlgorithm<P, DB> for ParallelBuildingAlgorithm
 where
     DB: Database + Clone + 'static,

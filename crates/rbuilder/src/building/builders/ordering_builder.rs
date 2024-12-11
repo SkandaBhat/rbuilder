@@ -20,7 +20,6 @@ use crate::{
 };
 use ahash::{HashMap, HashSet};
 use alloy_primitives::Address;
-use async_trait::async_trait;
 use reth::revm::cached::CachedReads;
 use reth_db::database::Database;
 use reth_provider::{BlockReader, DatabaseProviderFactory, StateProviderFactory};
@@ -377,7 +376,6 @@ impl OrderingBuildingAlgorithm {
     }
 }
 
-#[async_trait]
 impl<P, DB> BlockBuildingAlgorithm<P, DB> for OrderingBuildingAlgorithm
 where
     DB: Database + Clone + 'static,

@@ -6,7 +6,6 @@
 use std::{path::PathBuf, sync::Arc, thread::sleep, time::Duration};
 
 use alloy_primitives::U256;
-use async_trait::async_trait;
 use jsonrpsee::RpcModule;
 use rbuilder::{
     beacon_api_client::Client,
@@ -241,7 +240,6 @@ impl DummyBuildingAlgorithm {
     }
 }
 
-#[async_trait]
 impl<P, DB> BlockBuildingAlgorithm<P, DB> for DummyBuildingAlgorithm
 where
     DB: Database + Clone + 'static,

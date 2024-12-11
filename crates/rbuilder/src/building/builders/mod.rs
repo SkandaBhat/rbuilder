@@ -17,7 +17,6 @@ use crate::{
 };
 use ahash::HashSet;
 use alloy_primitives::{Address, Bytes, B256};
-use async_trait::async_trait;
 use block_building_helper::BlockBuildingHelper;
 use reth::{
     primitives::{BlobTransactionSidecar, SealedBlock},
@@ -229,7 +228,6 @@ pub struct BlockBuildingAlgorithmInput<P> {
 /// Algorithm to build blocks
 /// build_blocks should send block to input.sink until  input.cancel is cancelled.
 /// slot_bidder should be used to decide how much to bid.
-#[async_trait]
 pub trait BlockBuildingAlgorithm<P, DB>: Debug + Send + Sync
 where
     DB: Database + Clone + 'static,
