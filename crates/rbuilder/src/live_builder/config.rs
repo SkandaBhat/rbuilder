@@ -319,16 +319,14 @@ impl LiveBuilderConfig for Config {
         let bidding_service: Box<dyn BiddingService> =
             Box::new(TrueBlockValueBiddingService::new(&wallet_history));
 
-        let sink_factory = Box::new(
-            BlockSealingBidderFactory::new(
-                bidding_service,
-                relay_coordinator,
-                Arc::new(NullBidValueSource {}),
-                wallet_balance_watcher,
-                self.l1_config.max_concurrent_seals as usize,
-                best_block_store.clone(),
-            )
-        );
+        let sink_factory = Box::new(BlockSealingBidderFactory::new(
+            bidding_service,
+            relay_coordinator,
+            Arc::new(NullBidValueSource {}),
+            wallet_balance_watcher,
+            self.l1_config.max_concurrent_seals as usize,
+            best_block_store.clone(),
+        ));
 
         let payload_event = MevBoostSlotDataGenerator::new(
             self.l1_config.beacon_clients()?,
@@ -500,7 +498,14 @@ where
 {
     configs
         .into_iter()
-        .map(|cfg| create_builder(cfg, &root_hash_config, &sbundle_mergeabe_signers, best_block_store.clone()))
+        .map(|cfg| {
+            create_builder(
+                cfg,
+                &root_hash_config,
+                &sbundle_mergeabe_signers,
+                best_block_store.clone(),
+            )
+        })
         .collect()
 }
 
@@ -518,24 +523,24 @@ where
         + 'static,
 {
     match cfg.builder {
-        SpecificBuilderConfig::OrderingBuilder(order_cfg) => Arc::new(
-            OrderingBuildingAlgorithm::new(
+        SpecificBuilderConfig::OrderingBuilder(order_cfg) => {
+            Arc::new(OrderingBuildingAlgorithm::new(
                 root_hash_config.clone(),
                 sbundle_mergeabe_signers.to_vec(),
                 order_cfg,
                 cfg.name,
                 best_block_store,
-            )
-        ),
-        SpecificBuilderConfig::ParallelBuilder(parallel_cfg) => Arc::new(
-            ParallelBuildingAlgorithm::new(
+            ))
+        }
+        SpecificBuilderConfig::ParallelBuilder(parallel_cfg) => {
+            Arc::new(ParallelBuildingAlgorithm::new(
                 root_hash_config.clone(),
                 sbundle_mergeabe_signers.to_vec(),
                 parallel_cfg,
                 cfg.name,
                 best_block_store.clone(),
-            )
-        ),
+            ))
+        }
     }
 }
 
