@@ -132,7 +132,7 @@ impl ParallelSealerBidMakerProcess {
             tokio::spawn(async move {
                 match block.finalize_block(payout_tx_val) {
                     Ok(res) => {
-                        let _ = best_block_tracker.try_and_update(res.block);
+                        best_block_tracker.try_and_update(res.block).await;
                     }
                     Err(error) => error!(
                         block_number,

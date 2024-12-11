@@ -260,8 +260,12 @@ where
 
             match block.finalize_block(Some(U256::from(0))) {
                 Ok(res) => {
-                    // try to update best block
-                    let _ = self.best_block_tracker.try_and_update(res.block);
+                    // block on the async operation
+                    tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(
+                            self.best_block_tracker.try_and_update(res.block)
+                        )
+                    });
                 }
                 Err(e) => {
                     error!("Error on finalize_block on DummyBuildingAlgorithm: {:?}", e);

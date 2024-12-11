@@ -97,7 +97,7 @@ impl SequentialSealerBidMakerProcess {
             match tokio::task::spawn_blocking(move || block.finalize_block(payout_tx_val)).await {
                 Ok(finalize_res) => match finalize_res {
                     Ok(res) => {
-                        let _ = self.best_block_tracker.try_and_update(res.block);
+                        self.best_block_tracker.try_and_update(res.block).await;
                     }
                     Err(error) => {
                         if error.is_critical() {
