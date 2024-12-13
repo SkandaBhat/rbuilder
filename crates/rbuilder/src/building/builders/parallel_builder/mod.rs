@@ -30,7 +30,6 @@ use tracing::{error, trace};
 
 use crate::{
     building::builders::{
-        best_block_store::{BestBlockTracker, GlobalBestBlockStore},
         BacktestSimulateBlockInput, Block, BlockBuildingAlgorithm, BlockBuildingAlgorithmInput,
         LiveBuilderInput,
     },
@@ -388,7 +387,6 @@ pub struct ParallelBuildingAlgorithm {
     sbundle_mergeabe_signers: Vec<Address>,
     config: ParallelBuilderConfig,
     name: String,
-    best_block_tracker: BestBlockTracker,
 }
 
 impl ParallelBuildingAlgorithm {
@@ -397,15 +395,12 @@ impl ParallelBuildingAlgorithm {
         sbundle_mergeabe_signers: Vec<Address>,
         config: ParallelBuilderConfig,
         name: String,
-        best_block_store: GlobalBestBlockStore,
     ) -> Self {
-        let best_block_tracker = BestBlockTracker::new(best_block_store);
         Self {
             root_hash_config,
             sbundle_mergeabe_signers,
             config,
             name,
-            best_block_tracker,
         }
     }
 }
@@ -432,7 +427,6 @@ where
             builder_name: self.name.clone(),
             cancel: input.cancel,
             sbundle_mergeabe_signers: self.sbundle_mergeabe_signers.clone(),
-            best_block_tracker: self.best_block_tracker.clone(),
             phantom: Default::default(),
         };
         run_parallel_builder(live_input, &self.config);

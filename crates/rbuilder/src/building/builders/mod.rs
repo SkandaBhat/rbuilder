@@ -6,10 +6,7 @@ pub mod ordering_builder;
 pub mod parallel_builder;
 
 use crate::{
-    building::{
-        builders::best_block_store::{BestBlockTracker, GlobalBestBlockStore},
-        BlockBuildingContext, BlockOrders, BuiltBlockTrace, SimulatedOrderSink, Sorting,
-    },
+    building::{BlockBuildingContext, BlockOrders, BuiltBlockTrace, SimulatedOrderSink, Sorting},
     live_builder::{payload_events::MevBoostSlotData, simulation::SimulatedOrderCommand},
     primitives::{AccountNonce, OrderId, SimulatedOrder},
     roothash::RootHashConfig,
@@ -59,7 +56,6 @@ pub struct LiveBuilderInput<P, DB> {
     pub builder_name: String,
     pub cancel: CancellationToken,
     pub sbundle_mergeabe_signers: Vec<Address>,
-    pub best_block_tracker: BestBlockTracker,
     phantom: PhantomData<DB>,
 }
 
@@ -221,7 +217,6 @@ pub struct BlockBuildingAlgorithmInput<P> {
     pub input: broadcast::Receiver<SimulatedOrderCommand>,
     /// output for the blocks
     pub sink: Arc<dyn UnfinishedBlockBuildingSink>,
-    pub best_block_store: GlobalBestBlockStore,
     pub cancel: CancellationToken,
 }
 

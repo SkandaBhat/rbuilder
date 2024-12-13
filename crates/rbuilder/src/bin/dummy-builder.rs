@@ -116,7 +116,6 @@ async fn main() -> eyre::Result<()> {
         builders: vec![Arc::new(
             DummyBuildingAlgorithm::new(10, GlobalBestBlockStore::new()).await,
         )],
-        best_block_store: GlobalBestBlockStore::new(),
         run_sparse_trie_prefetcher: false,
         orderpool_sender,
         orderpool_receiver,

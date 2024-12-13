@@ -3,8 +3,7 @@ use std::{marker::PhantomData, sync::Arc, time::Duration};
 use crate::{
     building::{
         builders::{
-            best_block_store::GlobalBestBlockStore, BlockBuildingAlgorithm,
-            BlockBuildingAlgorithmInput, UnfinishedBlockBuildingSinkFactory,
+            BlockBuildingAlgorithm, BlockBuildingAlgorithmInput, UnfinishedBlockBuildingSinkFactory,
         },
         BlockBuildingContext,
     },
@@ -33,7 +32,6 @@ pub struct BlockBuildingPool<P, DB> {
     orderpool_subscriber: order_input::OrderPoolSubscriber,
     order_simulation_pool: OrderSimulationPool<P>,
     run_sparse_trie_prefetcher: bool,
-    best_block_store: GlobalBestBlockStore,
     phantom: PhantomData<DB>,
 }
 
@@ -52,7 +50,6 @@ where
         orderpool_subscriber: order_input::OrderPoolSubscriber,
         order_simulation_pool: OrderSimulationPool<P>,
         run_sparse_trie_prefetcher: bool,
-        best_block_store: GlobalBestBlockStore,
     ) -> Self {
         BlockBuildingPool {
             provider,
@@ -61,7 +58,6 @@ where
             orderpool_subscriber,
             order_simulation_pool,
             run_sparse_trie_prefetcher,
-            best_block_store,
             phantom: PhantomData,
         }
     }
@@ -126,7 +122,6 @@ where
                 input: broadcast_input.subscribe(),
                 sink: builder_sink.clone(),
                 cancel: cancel.clone(),
-                best_block_store: self.best_block_store.clone(),
             };
             let builder = builder.clone();
             tokio::task::spawn_blocking(move || {

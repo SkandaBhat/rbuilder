@@ -44,9 +44,11 @@ impl GlobalBestBlockStore {
     /// Compare the new block with the current best block and update if the new block is better.
     pub async fn compare_and_update(&self, new_block: Block) -> Result<(), UpdateRejected> {
         // Create a new scope to hold the lock for the entire function
-        let result = {
+        // Lock is released here when guard goes out of scope
+
+        {
             let mut guard = self.best_block.lock().await;
-            
+
             if guard.is_none() || new_block.has_higher_bid_value_than(guard.as_ref()) {
                 debug!(
                     "Updating best block bid value to {:?} for builder {:?} and block number {:?}, from {:?} for builder {:?}",
@@ -62,9 +64,7 @@ impl GlobalBestBlockStore {
             } else {
                 Err(UpdateRejected)
             }
-        }; // Lock is released here when guard goes out of scope
-
-        result
+        }
     }
 
     /// Subscribe to updates on the best block.

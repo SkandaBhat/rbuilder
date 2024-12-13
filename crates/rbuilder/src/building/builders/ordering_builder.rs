@@ -9,9 +9,7 @@ use crate::{
     building::{
         block_orders_from_sim_orders,
         builders::{
-            best_block_store::{BestBlockTracker, GlobalBestBlockStore},
-            block_building_helper::BlockBuildingHelper,
-            LiveBuilderInput, OrderIntakeConsumer,
+            block_building_helper::BlockBuildingHelper, LiveBuilderInput, OrderIntakeConsumer,
         },
         BlockBuildingContext, BlockOrders, ExecutionError, Sorting,
     },
@@ -29,7 +27,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::info;
 use tracing::{error, info_span, trace};
 
 use super::{
@@ -351,7 +348,6 @@ pub struct OrderingBuildingAlgorithm {
     sbundle_mergeabe_signers: Vec<Address>,
     config: OrderingBuilderConfig,
     name: String,
-    best_block_tracker: BestBlockTracker,
 }
 
 impl OrderingBuildingAlgorithm {
@@ -360,15 +356,12 @@ impl OrderingBuildingAlgorithm {
         sbundle_mergeabe_signers: Vec<Address>,
         config: OrderingBuilderConfig,
         name: String,
-        best_block_store: GlobalBestBlockStore,
     ) -> Self {
-        let best_block_tracker = BestBlockTracker::new(best_block_store);
         Self {
             root_hash_config,
             sbundle_mergeabe_signers,
             config,
             name,
-            best_block_tracker,
         }
     }
 }
@@ -386,7 +379,6 @@ where
     }
 
     fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>) {
-        info!("Building blocks with {}", self.name);
         let live_input = LiveBuilderInput {
             provider: input.provider,
             root_hash_config: self.root_hash_config.clone(),
@@ -396,7 +388,6 @@ where
             builder_name: self.name.clone(),
             cancel: input.cancel,
             sbundle_mergeabe_signers: self.sbundle_mergeabe_signers.clone(),
-            best_block_tracker: self.best_block_tracker.clone(),
             phantom: Default::default(),
         };
         run_ordering_builder(live_input, &self.config);

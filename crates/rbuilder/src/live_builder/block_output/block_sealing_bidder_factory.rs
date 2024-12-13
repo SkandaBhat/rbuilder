@@ -36,8 +36,6 @@ pub struct BlockSealingBidderFactory<P> {
     wallet_balance_watcher: WalletBalanceWatcher<P>,
     /// See [ParallelSealerBidMaker]
     max_concurrent_seals: usize,
-    /// Best block tracker.
-    best_block_tracker: BestBlockTracker,
 }
 
 impl<P> Debug for BlockSealingBidderFactory<P> {
@@ -61,16 +59,13 @@ impl<P> BlockSealingBidderFactory<P> {
         competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
         wallet_balance_watcher: WalletBalanceWatcher<P>,
         max_concurrent_seals: usize,
-        best_block_store: GlobalBestBlockStore,
     ) -> Self {
-        let best_block_tracker = BestBlockTracker::new(best_block_store);
         Self {
             bidding_service,
             relay_coordinator,
             competition_bid_value_source,
             wallet_balance_watcher,
             max_concurrent_seals,
-            best_block_tracker,
         }
     }
 }
@@ -96,6 +91,12 @@ where
         slot_data: MevBoostSlotData,
         cancel: tokio_util::sync::CancellationToken,
     ) -> std::sync::Arc<dyn crate::building::builders::UnfinishedBlockBuildingSink> {
+        // Create a new store for this block
+        let best_block_store = GlobalBestBlockStore::new();
+
+        // Create a new best block tracker for this block
+        let best_block_tracker = BestBlockTracker::new(best_block_store.clone());
+
         match self
             .wallet_balance_watcher
             .update_to_block(slot_data.block() - 1)
@@ -115,17 +116,18 @@ where
             slot_data.clone(),
             self.competition_bid_value_source.clone(),
             cancel.clone(),
+            best_block_store.clone(),
         );
 
         let sealer: Box<dyn BidMaker + Send + Sync> = if self.max_concurrent_seals == 1 {
             Box::new(SequentialSealerBidMaker::new(
-                self.best_block_tracker.clone(),
+                best_block_tracker.clone(),
                 cancel.clone(),
             ))
         } else {
             Box::new(ParallelSealerBidMaker::new(
                 self.max_concurrent_seals,
-                self.best_block_tracker.clone(),
+                best_block_tracker.clone(),
                 cancel.clone(),
             ))
         };

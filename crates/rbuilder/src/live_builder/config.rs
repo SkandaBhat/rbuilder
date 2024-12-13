@@ -18,7 +18,6 @@ use crate::{
     beacon_api_client::Client,
     building::{
         builders::{
-            best_block_store::GlobalBestBlockStore,
             ordering_builder::{OrderingBuilderConfig, OrderingBuildingAlgorithm},
             parallel_builder::{
                 parallel_build_backtest, ParallelBuilderConfig, ParallelBuildingAlgorithm,
@@ -260,7 +259,6 @@ impl L1Config {
         &self,
         chain_spec: Arc<ChainSpec>,
         bid_observer: Box<dyn BidObserver + Send + Sync>,
-        best_block_store: GlobalBestBlockStore,
     ) -> eyre::Result<(RelayCoordinator, Vec<MevBoostRelay>)> {
         let submission_config = self.submission_config(chain_spec, bid_observer)?;
         info!(
@@ -280,7 +278,7 @@ impl L1Config {
 
         let relays = self.create_relays()?;
         let relay_coordinator: RelayCoordinator =
-            RelayCoordinator::new(submission_config, relays.clone(), best_block_store.clone());
+            RelayCoordinator::new(submission_config, relays.clone());
         Ok((relay_coordinator, relays))
     }
 }
@@ -302,13 +300,9 @@ impl LiveBuilderConfig for Config {
             + Clone
             + 'static,
     {
-        // create sinlge best block store
-        let best_block_store = GlobalBestBlockStore::new();
-
         let (relay_coordinator, relays) = self.l1_config.create_relays_and_relay_coordinator(
             self.base_config.chain_spec()?,
             Box::new(NullBidObserver {}),
-            best_block_store.clone(),
         )?;
 
         let (wallet_balance_watcher, wallet_history) = WalletBalanceWatcher::new(
@@ -325,7 +319,6 @@ impl LiveBuilderConfig for Config {
             Arc::new(NullBidValueSource {}),
             wallet_balance_watcher,
             self.l1_config.max_concurrent_seals as usize,
-            best_block_store.clone(),
         ));
 
         let payload_event = MevBoostSlotDataGenerator::new(
@@ -341,7 +334,6 @@ impl LiveBuilderConfig for Config {
                 sink_factory,
                 payload_event,
                 provider,
-                best_block_store.clone(),
             )
             .await?;
         let root_hash_config = self.base_config.live_root_hash_config()?;
@@ -350,7 +342,6 @@ impl LiveBuilderConfig for Config {
             self.live_builders()?,
             root_hash_config,
             self.base_config.sbundle_mergeabe_signers(),
-            best_block_store.clone(),
         );
         Ok(live_builder.with_builders(builders))
     }
@@ -487,7 +478,6 @@ pub fn create_builders<P, DB>(
     configs: Vec<BuilderConfig>,
     root_hash_config: RootHashConfig,
     sbundle_mergeabe_signers: Vec<Address>,
-    best_block_store: GlobalBestBlockStore,
 ) -> Vec<Arc<dyn BlockBuildingAlgorithm<P, DB>>>
 where
     DB: Database + Clone + 'static,
@@ -498,14 +488,7 @@ where
 {
     configs
         .into_iter()
-        .map(|cfg| {
-            create_builder(
-                cfg,
-                &root_hash_config,
-                &sbundle_mergeabe_signers,
-                best_block_store.clone(),
-            )
-        })
+        .map(|cfg| create_builder(cfg, &root_hash_config, &sbundle_mergeabe_signers))
         .collect()
 }
 
@@ -513,7 +496,6 @@ fn create_builder<P, DB>(
     cfg: BuilderConfig,
     root_hash_config: &RootHashConfig,
     sbundle_mergeabe_signers: &[Address],
-    best_block_store: GlobalBestBlockStore,
 ) -> Arc<dyn BlockBuildingAlgorithm<P, DB>>
 where
     DB: Database + Clone + 'static,
@@ -529,7 +511,6 @@ where
                 sbundle_mergeabe_signers.to_vec(),
                 order_cfg,
                 cfg.name,
-                best_block_store,
             ))
         }
         SpecificBuilderConfig::ParallelBuilder(parallel_cfg) => {
@@ -538,7 +519,6 @@ where
                 sbundle_mergeabe_signers.to_vec(),
                 parallel_cfg,
                 cfg.name,
-                best_block_store.clone(),
             ))
         }
     }

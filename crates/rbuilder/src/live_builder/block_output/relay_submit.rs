@@ -98,7 +98,10 @@ async fn run_submit_to_relays_job(
     tokio::pin!(block_stream);
 
     while let Some(block) = block_stream.next().await {
-        info!("got a block from the store!: {:?}", block);
+        info!(
+            "got a block from the store! builder: {:?}, block number: {:?}",
+            block.builder_name, block.sealed_block.number
+        );
         res = Some(BuiltBlockInfo {
             bid_value: block.trace.bid_value,
             true_bid_value: block.trace.true_bid_value,
@@ -434,15 +437,10 @@ async fn submit_bid_to_the_relay(
 pub struct RelayCoordinator {
     submission_config: Arc<SubmissionConfig>,
     relays: HashMap<MevBoostRelayID, MevBoostRelay>,
-    best_block_store: GlobalBestBlockStore,
 }
 
 impl RelayCoordinator {
-    pub fn new(
-        submission_config: SubmissionConfig,
-        relays: Vec<MevBoostRelay>,
-        best_block_store: GlobalBestBlockStore,
-    ) -> Self {
+    pub fn new(submission_config: SubmissionConfig, relays: Vec<MevBoostRelay>) -> Self {
         let relays = relays
             .into_iter()
             .map(|relay| (relay.id.clone(), relay))
@@ -450,7 +448,6 @@ impl RelayCoordinator {
         Self {
             submission_config: Arc::new(submission_config),
             relays,
-            best_block_store,
         }
     }
 
@@ -459,6 +456,7 @@ impl RelayCoordinator {
         slot_data: MevBoostSlotData,
         competition_bid_value_source: Arc<dyn BidValueSource + Send + Sync>,
         cancel: CancellationToken,
+        best_block_store: GlobalBestBlockStore,
     ) {
         let relays = slot_data
             .relays
@@ -476,7 +474,7 @@ impl RelayCoordinator {
             self.submission_config.clone(),
             cancel,
             competition_bid_value_source,
-            self.best_block_store.clone(),
+            best_block_store,
         ));
     }
 }
