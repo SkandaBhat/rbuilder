@@ -2,7 +2,7 @@ use futures::stream::{Stream, StreamExt};
 use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex};
 use tokio_stream::wrappers::BroadcastStream;
-use tracing::info;
+use tracing::debug;
 
 use super::Block;
 
@@ -43,15 +43,28 @@ impl GlobalBestBlockStore {
 
     /// Compare the new block with the current best block and update if the new block is better.
     pub async fn compare_and_update(&self, new_block: Block) -> Result<(), UpdateRejected> {
-        let mut guard = self.best_block.lock().await;
-        if guard.is_none() || new_block.has_higher_bid_value_than(guard.as_ref()) {
-            info!("Updating best block to {:?}", new_block.trace.bid_value);
-            *guard = Some(new_block.clone());
-            let _ = self.tx.send(new_block);
-            Ok(())
-        } else {
-            Err(UpdateRejected)
-        }
+        // Create a new scope to hold the lock for the entire function
+        let result = {
+            let mut guard = self.best_block.lock().await;
+            
+            if guard.is_none() || new_block.has_higher_bid_value_than(guard.as_ref()) {
+                debug!(
+                    "Updating best block bid value to {:?} for builder {:?} and block number {:?}, from {:?} for builder {:?}",
+                    new_block.trace.bid_value,
+                    new_block.builder_name,
+                    new_block.sealed_block.number,
+                    guard.as_ref().map(|block| block.trace.bid_value).unwrap_or_default(),
+                    guard.as_ref().map(|block| block.builder_name.clone()).unwrap_or_default()
+                );
+                *guard = Some(new_block.clone());
+                let _ = self.tx.send(new_block);
+                Ok(())
+            } else {
+                Err(UpdateRejected)
+            }
+        }; // Lock is released here when guard goes out of scope
+
+        result
     }
 
     /// Subscribe to updates on the best block.
